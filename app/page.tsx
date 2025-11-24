@@ -8,11 +8,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import UserStatus from '@/components/UserStatus';
 import CommentSection from '@/components/CommentSection';
+import ProfileModal from '@/components/ProfileModal';
 import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import VideoSearchModal from '@/components/VideoSearchModal';
 
-// --- 型定義 ---
 type Subtitle = { text: string; offset: number; duration: number; };
 type DictionaryData = {
   word: string; phonetic?: string; audio?: string; translation?: string;
@@ -30,26 +30,22 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const initialVideoId = searchParams.get('videoId') || 'arj7oStGLkU';
 
-  // ユーザー情報
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState('Hero');
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true
   });
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // 設定パネル開閉
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
 
-  // 新機能State
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // 動画関連
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [player, setPlayer] = useState<YouTubePlayer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
-  // 学習機能
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [dictData, setDictData] = useState<DictionaryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -57,10 +53,8 @@ function HomeContent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [manualTargetText, setManualTargetText] = useState<string | null>(null);
 
-  // 編集用の一時ステート
   const [editName, setEditName] = useState('');
 
-  // --- テーマ設定 ---
   const getThemeStyles = () => {
     switch (userProfile.theme) {
       case 'kids': return 'font-sans text-lg bg-yellow-50 text-gray-900';
@@ -69,7 +63,6 @@ function HomeContent() {
     }
   };
 
-  // --- 初期化 ---
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -92,7 +85,6 @@ function HomeContent() {
     }
   };
 
-  // --- 学習ログ & XP ---
   const logStudyActivity = async () => {
     if (!userId) return;
     const today = new Date().toISOString().split('T')[0];
@@ -127,20 +119,15 @@ function HomeContent() {
     logStudyActivity();
   };
 
-  // 設定変更：テーマ
   const handleThemeChange = async (newTheme: 'kids' | 'student' | 'pro') => {
     if (!userId) return;
     try {
       const { error } = await supabase.from('profiles').update({ theme: newTheme }).eq('id', userId);
       if (error) throw error;
       setUserProfile(prev => ({ ...prev, theme: newTheme }));
-    } catch (e) {
-      console.error(e);
-      alert('設定の保存に失敗しました');
-    }
+    } catch (e) { alert('設定の保存に失敗しました'); }
   };
 
-  // 設定変更：名前
   const handleNameSave = async () => {
     if (!userId || !editName.trim()) return;
     try {
@@ -148,20 +135,17 @@ function HomeContent() {
       if (error) throw error;
       setUsername(editName);
       alert('名前を変更しました');
-    } catch (e) {
-      alert('名前の変更に失敗しました');
-    }
+    } catch (e) { alert('名前の変更に失敗しました'); }
   };
 
   const handleGoalChange = async () => {
-    const newGoal = prompt("目標を入力してください (例: TOEIC 800)", userProfile.goal || "");
+    const newGoal = prompt("目標を入力してください", userProfile.goal || "");
     if (newGoal !== null && userId) {
       await supabase.from('profiles').update({ goal: newGoal }).eq('id', userId);
       setUserProfile(prev => ({ ...prev, goal: newGoal }));
     }
   };
 
-  // --- 動画機能 ---
   const loadVideo = async (idOverride?: string) => {
     const targetId = idOverride || videoId;
     if (idOverride) setVideoId(idOverride);
@@ -198,7 +182,6 @@ function HomeContent() {
     finally { setIsRegistering(false); }
   };
 
-  // --- 辞書機能 ---
   const handleWordClick = async (word: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const clean = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase();
@@ -229,7 +212,6 @@ function HomeContent() {
     finally { setIsSaving(false); }
   };
 
-  // --- プレイヤー制御 ---
   const onReady = (e: { target: YouTubePlayer }) => {
     setPlayer(e.target);
     const start = searchParams.get('start');
@@ -271,19 +253,18 @@ function HomeContent() {
           <div className="scale-75 origin-right md:scale-100">
             <UserStatus level={userProfile.level} xp={userProfile.xp} nextLevelXp={userProfile.next_level_xp} />
           </div>
-          <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
+          <button onClick={() => setIsProfileOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
         </div>
       </div>
 
-      {/* --- 設定パネル (シンプル版) --- */}
-      {isSettingsOpen && (
+      {/* 設定パネル */}
+      {isProfileOpen && (
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white p-6 rounded-xl max-w-sm w-full text-black shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">⚙️ 設定</h3>
-              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button>
+              <button onClick={() => setIsProfileOpen(false)} className="text-gray-400 text-xl">×</button>
             </div>
-
             <div className="mb-6">
               <p className="mb-2 font-bold text-sm text-gray-500">モード切替</p>
               <div className="flex gap-2">
@@ -292,20 +273,13 @@ function HomeContent() {
                 <button onClick={() => handleThemeChange('pro')} className={`flex-1 py-3 rounded-lg border font-bold transition ${userProfile.theme === 'pro' ? 'bg-gray-800 text-white border-black ring-2 ring-gray-500' : 'hover:bg-gray-50'}`}>😎 Pro</button>
               </div>
             </div>
-
             <div className="mb-6">
               <p className="mb-2 font-bold text-sm text-gray-500">名前変更</p>
               <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  className="flex-1 border p-2 rounded text-black"
-                />
+                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 border p-2 rounded text-black" />
                 <button onClick={handleNameSave} className="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700">保存</button>
               </div>
             </div>
-
             <div className="pt-4 border-t">
               <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 hover:bg-red-50 rounded transition">ログアウト</button>
             </div>
@@ -313,15 +287,18 @@ function HomeContent() {
         </div>
       )}
 
-      {/* サブメニュー */}
+      {/* サブメニュー (ドリル追加済み) */}
       <div className={`w-full max-w-6xl flex gap-2 overflow-x-auto p-2 md:p-0 mb-4 ${isPro ? 'text-gray-300' : ''}`}>
         <Link href="/search" className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">🔍 {isKids ? 'さがす' : 'Search'}</Link>
         <Link href="/vocab" className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📚 {isKids ? 'たんご' : 'Vocab'}</Link>
         <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📖 {isKids ? 'ほん' : 'Textbook'}</Link>
+        {/* ▼▼▼ ドリルへのリンクを追加 ▼▼▼ */}
+        <Link href="/drill" className="bg-red-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">🔥 {isKids ? 'れんしゅう' : 'Drill'}</Link>
+        {/* ▲▲▲ 追加完了 ▲▲▲ */}
         <button onClick={handleSaveToLibrary} disabled={isRegistering || subtitles.length === 0} className="bg-purple-600 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap disabled:opacity-50">💾 {isKids ? 'ほぞん' : 'Save Lib'}</button>
       </div>
 
-      {/* PC検索バー */}
+      {/* PC用メニュー (ドリル追加済み) */}
       <div className="hidden md:flex w-full max-w-6xl mb-6 gap-2">
         <button
           onClick={() => setIsSearchOpen(true)}
@@ -337,19 +314,15 @@ function HomeContent() {
       <div className="flex flex-col md:flex-row gap-4 md:gap-8 w-full max-w-6xl px-4 md:px-0">
         <div className="flex-1 flex flex-col gap-4 sticky top-14 md:static z-30">
           {!isKids && userId && <Heatmap userId={userId} />}
-
           <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl shrink-0 transition-all ${isAudioOnly ? 'opacity-0 h-0 pointer-events-none' : 'bg-black'}`}>
             <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }} className="absolute top-0 left-0 w-full h-full" />
           </div>
-
           <button onClick={() => setIsAudioOnly(!isAudioOnly)} className={`w-full py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 ${isAudioOnly ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
             {isAudioOnly ? '🙈 Audio Only (ON) - Tap to Show Video' : '🙉 Switch to Audio Only'}
           </button>
-
           <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
             <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
           </div>
-
           <CommentSection videoId={videoId} />
         </div>
 
@@ -412,5 +385,3 @@ export default function Home() {
     </Suspense>
   );
 }
-
-
