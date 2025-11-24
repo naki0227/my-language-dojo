@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import EmbeddedPlayer from '@/components/EmbeddedPlayer';
+import CommentSection from '@/components/CommentSection'; // 追加
 import { useParams } from 'next/navigation';
 
 type Textbook = {
@@ -12,6 +13,7 @@ type Textbook = {
     title: string;
     content: string;
     created_at: string;
+    related_wordbook_id: number | null; // 追加
 };
 
 export default function TextbookViewer() {
@@ -32,25 +34,18 @@ export default function TextbookViewer() {
 
     if (!book) return <div className="p-10 text-center">Loading textbook...</div>;
 
-    // --- コンテンツの解析 (動画タグをプレイヤーに変換) ---
-    // ルール: [[video:ID:開始秒:タイトル]] を探す
     const renderContent = (text: string) => {
         const regex = /\[\[video:(.*?):(\d+):(.*?)]]/g;
         const parts = text.split(regex);
 
         return parts.map((part, i) => {
-            // 4つごとに動画情報のセットが来る
             if (i % 4 === 1) {
                 const videoId = parts[i];
                 const start = parseInt(parts[i + 1]);
                 const title = parts[i + 2];
                 return <EmbeddedPlayer key={i} videoId={videoId} start={start} title={title} />;
             }
-            // 動画情報の断片はスキップ
             if (i % 4 === 2 || i % 4 === 3) return null;
-
-            // 通常のテキスト
-            // 修正: ReactMarkdownに直接classNameをつけず、divで囲む
             return (
                 <div key={i} className="prose max-w-none my-4">
                     <ReactMarkdown>{part}</ReactMarkdown>
@@ -65,7 +60,7 @@ export default function TextbookViewer() {
                 <Link href="/textbook" className="text-blue-500 hover:underline">← 一覧に戻る</Link>
             </div>
 
-            <article className="w-full max-w-3xl bg-white rounded-xl shadow-lg p-8 md:p-12">
+            <article className="w-full max-w-3xl bg-white rounded-xl shadow-lg p-8 md:p-12 mb-8">
                 <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4 border-b pb-4">
                     {book.title}
                 </h1>
@@ -73,11 +68,29 @@ export default function TextbookViewer() {
                     作成日: {new Date(book.created_at).toLocaleDateString()}
                 </p>
 
-                {/* 本文エリア */}
+                {/* 本文 */}
                 <div className="text-gray-800 leading-relaxed space-y-6">
                     {renderContent(book.content)}
                 </div>
+
+                {/* ドリルへのリンク (関連付けられている場合のみ表示) */}
+                {book.related_wordbook_id && (
+                    <div className="mt-12 p-6 bg-green-50 rounded-xl border border-green-200 text-center">
+                        <h3 className="text-lg font-bold text-green-800 mb-2">💪 この単元の単語をマスターしよう！</h3>
+                        <Link
+                            href={`/drill/word/${book.related_wordbook_id}`}
+                            className="inline-block bg-green-600 text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-green-700 transition transform hover:-translate-y-1"
+                        >
+                            単語練習に進む →
+                        </Link>
+                    </div>
+                )}
             </article>
+
+            {/* コメント欄 (教科書IDを渡す) */}
+            <div className="w-full max-w-3xl">
+                <CommentSection textbookId={book.id} />
+            </div>
         </main>
     );
 }

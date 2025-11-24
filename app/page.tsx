@@ -13,6 +13,7 @@ import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import VideoSearchModal from '@/components/VideoSearchModal';
 
+// --- 型定義 ---
 type Subtitle = { text: string; offset: number; duration: number; };
 type DictionaryData = {
   word: string; phonetic?: string; audio?: string; translation?: string;
@@ -30,22 +31,27 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const initialVideoId = searchParams.get('videoId') || 'arj7oStGLkU';
 
+  // ユーザー情報
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState('Hero');
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true
   });
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
 
+  // 新機能
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  // 動画関連
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [player, setPlayer] = useState<YouTubePlayer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
+  // 学習機能
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [dictData, setDictData] = useState<DictionaryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -53,8 +59,10 @@ function HomeContent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [manualTargetText, setManualTargetText] = useState<string | null>(null);
 
+  // 編集用の一時ステート
   const [editName, setEditName] = useState('');
 
+  // --- テーマ設定 ---
   const getThemeStyles = () => {
     switch (userProfile.theme) {
       case 'kids': return 'font-sans text-lg bg-yellow-50 text-gray-900';
@@ -63,6 +71,7 @@ function HomeContent() {
     }
   };
 
+  // --- 初期化 ---
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -100,19 +109,16 @@ function HomeContent() {
     if (!userId) return;
     const { data: current } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (!current) return;
-
     let newXp = current.xp + amount;
     let newLevel = current.level;
     let newNextXp = current.next_level_xp;
     let leveledUp = false;
-
     if (newXp >= newNextXp) {
       newXp -= newNextXp;
       newLevel += 1;
       newNextXp = Math.floor(newNextXp * 1.2);
       leveledUp = true;
     }
-
     await supabase.from('profiles').update({ level: newLevel, xp: newXp, next_level_xp: newNextXp }).eq('id', userId);
     setUserProfile({ ...current, level: newLevel, xp: newXp, next_level_xp: newNextXp });
     if (leveledUp) alert(`🎉 LEVEL UP! Lv.${newLevel}!`);
@@ -139,7 +145,7 @@ function HomeContent() {
   };
 
   const handleGoalChange = async () => {
-    const newGoal = prompt("目標を入力してください", userProfile.goal || "");
+    const newGoal = prompt("目標を入力してください (例: TOEIC 800)", userProfile.goal || "");
     if (newGoal !== null && userId) {
       await supabase.from('profiles').update({ goal: newGoal }).eq('id', userId);
       setUserProfile(prev => ({ ...prev, goal: newGoal }));
@@ -168,14 +174,11 @@ function HomeContent() {
     try {
       const { data: existing } = await supabase.from('library_videos').select('id').match({ user_id: userId, video_id: videoId }).single();
       if (existing) { alert('登録済みです'); setIsRegistering(false); return; }
-
       const { error: ve } = await supabase.from('library_videos').insert([{ user_id: userId, video_id: videoId, title: `Video ${videoId}`, thumbnail_url: `https://img.youtube.com/vi/${videoId}/mqdefault.jpg` }]);
       if (ve) throw ve;
-
       const rows = subtitles.map(s => ({ user_id: userId, video_id: videoId, text: s.text, start_time: s.offset / 1000, duration: s.duration / 1000 }));
       const { error: se } = await supabase.from('library_subtitles').insert(rows);
       if (se) throw se;
-
       await addXp(100);
       alert('登録完了 (+100 XP)');
     } catch (e) { alert('登録失敗'); }
@@ -231,119 +234,149 @@ function HomeContent() {
   const isKids = userProfile.theme === 'kids';
 
   return (
-    <main className={`min-h-screen pb-20 md:p-8 flex flex-col items-center transition-colors duration-500 ${getThemeStyles()}`}>
+    <main className={`h-screen flex flex-col bg-gray-50 transition-colors duration-500 ${getThemeStyles()} overflow-hidden`}>
 
-      {showPlacementTest && userId && (
-        <PlacementTest userId={userId} onComplete={() => setShowPlacementTest(false)} />
-      )}
+      {showPlacementTest && userId && <PlacementTest userId={userId} onComplete={() => setShowPlacementTest(false)} />}
 
-      {/* ヘッダー */}
-      <div className={`w-full max-w-6xl flex flex-wrap justify-between items-center p-4 md:p-0 md:mb-6 sticky top-0 z-50 md:static border-b md:border-none ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white/90 backdrop-blur-sm'}`}>
+      {/* --- 固定ヘッダーエリア --- */}
+      <div className={`shrink-0 w-full flex flex-wrap justify-between items-center p-4 border-b ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-4">
-          <h1 className={`text-xl md:text-3xl font-bold ${isKids ? 'font-comic text-yellow-500 tracking-wider' : ''}`}>
-            {isKids ? '🐯 English Dojo' : 'My Language Dojo'}
+          <h1 className={`text-xl font-bold ${isKids ? 'font-comic text-yellow-500' : ''}`}>
+            {isKids ? '🐯 English' : 'My Dojo'}
           </h1>
-          <button onClick={handleGoalChange} className={`text-xs px-2 py-1 rounded border ${isPro ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
-            🎯 {userProfile.goal || '目標を設定'}
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2 mt-2 md:mt-0">
-          <span className="hidden md:inline text-sm font-bold opacity-70 mr-2">{username}</span>
-          <div className="scale-75 origin-right md:scale-100">
+          <div className="scale-75 origin-left">
             <UserStatus level={userProfile.level} xp={userProfile.xp} nextLevelXp={userProfile.next_level_xp} />
           </div>
-          <button onClick={() => setIsProfileOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
         </div>
       </div>
 
-      {/* 設定パネル */}
-      {isProfileOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4 animate-fade-in">
+      {/* --- 設定パネル --- */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white p-6 rounded-xl max-w-sm w-full text-black shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-lg">⚙️ 設定</h3>
-              <button onClick={() => setIsProfileOpen(false)} className="text-gray-400 text-xl">×</button>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button>
             </div>
-            <div className="mb-6">
-              <p className="mb-2 font-bold text-sm text-gray-500">モード切替</p>
-              <div className="flex gap-2">
-                <button onClick={() => handleThemeChange('kids')} className={`flex-1 py-3 rounded-lg border font-bold transition ${userProfile.theme === 'kids' ? 'bg-yellow-100 border-yellow-400 text-yellow-700 ring-2 ring-yellow-200' : 'hover:bg-gray-50'}`}>👶 Kids</button>
-                <button onClick={() => handleThemeChange('student')} className={`flex-1 py-3 rounded-lg border font-bold transition ${userProfile.theme === 'student' ? 'bg-blue-100 border-blue-400 text-blue-700 ring-2 ring-blue-200' : 'hover:bg-gray-50'}`}>🧑‍🎓 Std</button>
-                <button onClick={() => handleThemeChange('pro')} className={`flex-1 py-3 rounded-lg border font-bold transition ${userProfile.theme === 'pro' ? 'bg-gray-800 text-white border-black ring-2 ring-gray-500' : 'hover:bg-gray-50'}`}>😎 Pro</button>
+            <div className="space-y-4">
+              <div>
+                <p className="mb-1 font-bold text-sm text-gray-500">モード切替</p>
+                <div className="flex gap-2">
+                  <button onClick={() => handleThemeChange('kids')} className={`flex-1 py-2 rounded-lg border font-bold text-sm ${userProfile.theme === 'kids' ? 'bg-yellow-100 border-yellow-400 text-yellow-700' : ''}`}>Kids</button>
+                  <button onClick={() => handleThemeChange('student')} className={`flex-1 py-2 rounded-lg border font-bold text-sm ${userProfile.theme === 'student' ? 'bg-blue-100 border-blue-400 text-blue-700' : ''}`}>Std</button>
+                  <button onClick={() => handleThemeChange('pro')} className={`flex-1 py-2 rounded-lg border font-bold text-sm ${userProfile.theme === 'pro' ? 'bg-gray-800 text-white border-black' : ''}`}>Pro</button>
+                </div>
               </div>
-            </div>
-            <div className="mb-6">
-              <p className="mb-2 font-bold text-sm text-gray-500">名前変更</p>
-              <div className="flex gap-2">
-                <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 border p-2 rounded text-black" />
-                <button onClick={handleNameSave} className="bg-blue-600 text-white px-4 rounded font-bold hover:bg-blue-700">保存</button>
+              <div>
+                <p className="mb-1 font-bold text-sm text-gray-500">目標</p>
+                <button onClick={handleGoalChange} className="w-full py-2 border rounded text-sm text-gray-700">🎯 {userProfile.goal || '目標を設定'}</button>
               </div>
-            </div>
-            <div className="pt-4 border-t">
-              <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 hover:bg-red-50 rounded transition">ログアウト</button>
+              <div>
+                <p className="mb-1 font-bold text-sm text-gray-500">名前</p>
+                <div className="flex gap-2">
+                  <input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 border p-2 rounded text-black" />
+                  <button onClick={handleNameSave} className="bg-blue-600 text-white px-4 rounded font-bold text-sm">保存</button>
+                </div>
+              </div>
+              <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 hover:bg-red-50 border rounded">ログアウト</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* サブメニュー (ドリル追加済み) */}
-      <div className={`w-full max-w-6xl flex gap-2 overflow-x-auto p-2 md:p-0 mb-4 ${isPro ? 'text-gray-300' : ''}`}>
-        <Link href="/search" className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">🔍 {isKids ? 'さがす' : 'Search'}</Link>
-        <Link href="/vocab" className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📚 {isKids ? 'たんご' : 'Vocab'}</Link>
-        <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📖 {isKids ? 'ほん' : 'Textbook'}</Link>
-        {/* ▼▼▼ ドリルへのリンクを追加 ▼▼▼ */}
-        <Link href="/drill" className="bg-red-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">🔥 {isKids ? 'れんしゅう' : 'Drill'}</Link>
-        {/* ▲▲▲ 追加完了 ▲▲▲ */}
-        <button onClick={handleSaveToLibrary} disabled={isRegistering || subtitles.length === 0} className="bg-purple-600 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap disabled:opacity-50">💾 {isKids ? 'ほぞん' : 'Save Lib'}</button>
+      {/* --- サブメニュー (固定) --- */}
+      <div className={`shrink-0 w-full flex gap-2 overflow-x-auto p-2 border-b ${isPro ? 'bg-gray-900 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200'}`}>
+        <button onClick={() => setIsSearchOpen(true)} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-1">🔍 動画検索</button>
+        <Link href="/vocab" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 単語帳</Link>
+        <Link href="/drill" className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔥 ドリル</Link>
+        <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📖 教科書</Link>
+        <button onClick={handleSaveToLibrary} disabled={isRegistering || subtitles.length === 0} className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap disabled:opacity-50">💾 保存</button>
       </div>
 
-      {/* PC用メニュー (ドリル追加済み) */}
-      <div className="hidden md:flex w-full max-w-6xl mb-6 gap-2">
-        <button
-          onClick={() => setIsSearchOpen(true)}
-          className={`flex-1 border rounded-lg text-left px-4 py-2 transition flex items-center gap-2 ${isPro ? 'bg-gray-800 border-gray-700 hover:bg-gray-700' : 'bg-white border-gray-300 hover:bg-gray-50 text-gray-500'}`}
-        >
-          <span className="text-xl">🔍</span> YouTube動画を検索・選択...
-        </button>
-        <input type="text" value={videoId} onChange={(e) => setVideoId(e.target.value)} className={`w-32 border p-2 rounded text-sm ${isPro ? 'bg-gray-800 text-white border-gray-700' : 'text-black'}`} placeholder="ID" />
-        <button onClick={() => loadVideo()} className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 font-bold">Play</button>
-      </div>
+      {/* === レイアウト本体 === */}
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
 
-      {/* メインエリア */}
-      <div className="flex flex-col md:flex-row gap-4 md:gap-8 w-full max-w-6xl px-4 md:px-0">
-        <div className="flex-1 flex flex-col gap-4 sticky top-14 md:static z-30">
-          {!isKids && userId && <Heatmap userId={userId} />}
-          <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl shrink-0 transition-all ${isAudioOnly ? 'opacity-0 h-0 pointer-events-none' : 'bg-black'}`}>
-            <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }} className="absolute top-0 left-0 w-full h-full" />
+        {/* ===============
+            📱 スマホビュー (md:hidden)
+            構成: [動画(固定)] -> [スクロールエリア(マイク/字幕/コメント)]
+           =============== */}
+        <div className="md:hidden flex flex-col h-full w-full">
+          {/* 1. 動画プレイヤー (固定) */}
+          <div className={`shrink-0 w-full bg-black transition-all duration-300 ${isAudioOnly ? 'h-12' : 'aspect-video'}`}>
+            {isAudioOnly ? (
+              <div className="w-full h-full flex items-center justify-center text-white text-xs cursor-pointer" onClick={() => setIsAudioOnly(false)}>
+                🙈 Audio Only Mode (Tap to Show)
+              </div>
+            ) : (
+              <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }} className="w-full h-full" />
+            )}
           </div>
-          <button onClick={() => setIsAudioOnly(!isAudioOnly)} className={`w-full py-3 rounded-lg font-bold shadow transition flex items-center justify-center gap-2 ${isAudioOnly ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700'}`}>
-            {isAudioOnly ? '🙈 Audio Only (ON) - Tap to Show Video' : '🙉 Switch to Audio Only'}
-          </button>
-          <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
+
+          {/* 2. 耳だけモードスイッチ */}
+          {!isAudioOnly && (
+            <button onClick={() => setIsAudioOnly(true)} className="shrink-0 w-full py-2 bg-gray-200 text-xs font-bold text-gray-600 text-center border-b">
+              🙉 Switch to Audio Only
+            </button>
+          )}
+
+          {/* 3. スクロールエリア */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
             <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
+
+            <div className={`rounded-lg shadow p-4 ${isPro ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
+              <h2 className="text-sm opacity-50 font-bold mb-2">Transcript</h2>
+              <div className="space-y-2">
+                {subtitles.length > 0 ? subtitles.map((sub, i) => (
+                  <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
+                    {(sub.text || '').split(' ').map((word, wIndex) => {
+                      const isHard = word.length >= 6;
+                      return (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${isHard ? 'text-blue-500 font-bold' : ''}`}>{word}</span>);
+                    })}
+                  </div>
+                )) : <p className="opacity-50 text-center">Loading subtitles...</p>}
+              </div>
+            </div>
+
+            <CommentSection videoId={videoId} />
           </div>
-          <CommentSection videoId={videoId} />
         </div>
 
-        <div className={`flex-1 rounded-lg shadow-lg border p-2 md:p-4 min-h-[300px] ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-          <h2 className="text-sm opacity-50 font-bold mb-2 px-2">Transcript</h2>
-          <div className="space-y-2 h-[400px] md:h-[600px] overflow-y-auto">
-            {subtitles.length > 0 ? (
-              subtitles.map((sub, i) => (
-                <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base md:text-lg leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
-                  {(sub.text || '').split(' ').map((word, wIndex) => {
-                    const isHard = word.length >= 6;
-                    return (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${isHard ? 'text-blue-500 font-bold' : ''}`}>{word}</span>);
-                  })}
+        {/* ===============
+            💻 PCビュー (hidden md:flex)
+            構成: 左[動画/マイク/コメント(スクロール)] | 右[字幕(スクロール)]
+           =============== */}
+        <div className="hidden md:flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
+          {/* 左カラム */}
+          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+            {!isKids && userId && <Heatmap userId={userId} />}
+            <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl bg-black ${isAudioOnly ? 'h-12' : ''}`}>
+              {!isAudioOnly && <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%' }} className="absolute top-0 left-0 w-full h-full" />}
+            </div>
+            <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
+              <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
+            </div>
+            <CommentSection videoId={videoId} />
+          </div>
+
+          {/* 右カラム (字幕) */}
+          <div className={`w-1/3 rounded-lg shadow-lg border h-full flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+            <div className="p-4 border-b"><h2 className="text-sm font-bold opacity-50">Transcript</h2></div>
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {subtitles.map((sub, i) => (
+                <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-lg leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
+                  {(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}
                 </div>
-              ))
-            ) : <p className="opacity-50 text-center mt-10">Waiting for video...</p>}
+              ))}
+            </div>
           </div>
         </div>
+
       </div>
 
-      {/* 辞書ポップアップ */}
+      {/* 辞書ポップアップ (ボトムシート) */}
       {selectedWord && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSelectedWord(null)} />
@@ -355,7 +388,6 @@ function HomeContent() {
             {isLoading ? <p>Loading...</p> : dictData ? (
               <div className="space-y-4">
                 <p className="text-xl font-bold">{dictData.translation}</p>
-                {dictData.meanings.length > 0 && (<div className="pr-2 text-sm opacity-80">{dictData.meanings[0].definitions[0].definition}</div>)}
                 <button onClick={handleSaveWord} disabled={isSaving} className={`w-full py-3 rounded-lg font-bold shadow-lg ${isSaving ? 'bg-gray-500' : 'bg-green-600 text-white'}`}>{isSaving ? 'Saving...' : '＋ Save'}</button>
               </div>
             ) : <p>No data</p>}
@@ -385,3 +417,5 @@ export default function Home() {
     </Suspense>
   );
 }
+
+
