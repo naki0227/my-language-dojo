@@ -12,7 +12,9 @@ import ProfileModal from '@/components/ProfileModal';
 import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import VideoSearchModal from '@/components/VideoSearchModal';
+import AIChatButton from '@/components/AIChatButton';
 
+// --- 型定義 ---
 type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
 type DictionaryData = {
   word: string; phonetic?: string; audio?: string; translation?: string;
@@ -23,11 +25,18 @@ type UserProfile = {
   theme: 'kids' | 'student' | 'pro';
   goal: string;
   placement_test_done: boolean;
+  learning_target: string; // 学習対象言語 (例: Spanish)
 };
 
 const SUPPORTED_LANGUAGES = [
-  { code: 'ja', label: '🇯🇵 日本語' }, { code: 'en', label: '🇺🇸 英語' }, { code: 'zh', label: '🇨🇳 中国語' },
-  { code: 'ko', label: '🇰🇷 韓国語' }, { code: 'pt', label: '🇧🇷 ポルトガル語' }, { code: 'ar', label: '🇸🇦 アラビア語' }, { code: 'ru', label: '🇷🇺 ロシア語' },
+  { code: 'en', label: '🇬🇧 English' },
+  { code: 'es', label: '🇪🇸 Spanish' },
+  { code: 'fr', label: '🇫🇷 French' },
+  { code: 'zh', label: '🇨🇳 Chinese' },
+  { code: 'ko', label: '🇰🇷 Korean' },
+  { code: 'pt', label: '🇧🇷 Portuguese' },
+  { code: 'ar', label: '🇸🇦 Arabic' },
+  { code: 'ru', label: '🇷🇺 Russian' },
 ];
 
 function HomeContent() {
@@ -37,7 +46,9 @@ function HomeContent() {
 
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState('Hero');
-  const [userProfile, setUserProfile] = useState<UserProfile>({ id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true });
+  const [userProfile, setUserProfile] = useState<UserProfile>({
+    id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English'
+  });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
@@ -115,6 +126,18 @@ function HomeContent() {
     logStudyActivity();
   };
 
+  // ★学習対象言語の更新 (プロフィールに反映)
+  const handleTargetLanguageChange = async (newLang: string) => {
+    if (!userId) return;
+    try {
+      const { error } = await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
+      if (error) throw error;
+      setUserProfile(prev => ({ ...prev, learning_target: newLang }));
+      alert(`学習対象を ${newLang} に変更しました！`);
+      setIsSettingsOpen(false);
+    } catch (e) { alert('設定の保存に失敗しました'); }
+  };
+
   const handleThemeChange = async (newTheme: any) => {
     if (!userId) return;
     await supabase.from('profiles').update({ theme: newTheme }).eq('id', userId);
@@ -132,9 +155,15 @@ function HomeContent() {
 
   const loadVideo = async (idOverride?: string) => {
     const targetId = idOverride || videoId;
-    if (idOverride) setVideoId(idOverride);
-    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null); setSelectedLangs([]);
+    if (idOverride) setVideoId(targetId);
+    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
+    setSelectedLangs([]);
     try {
+      // 辞書APIが英語前提なので、対象言語が英語でない場合はエラーを出して終了させる
+      if (userProfile.learning_target !== 'English') {
+        alert(`現在、AI採点と言葉のタップ機能は「English」専用です。学習対象言語を「English」に変更するか、非言語系コンテンツに切り替えてください。`);
+      }
+
       const res = await fetch(`/api/transcript?videoId=${targetId}`);
       const data = await res.json();
       if (data.error) alert(`字幕エラー: ${data.error}`);
@@ -153,6 +182,7 @@ function HomeContent() {
       let updatedSubtitles = [...subtitles];
       const promises = langsToFetch.map(async (lang) => {
         if (updatedSubtitles.length > 0 && updatedSubtitles[0].translations[lang]) return null;
+        // 翻訳APIは、学習対象言語の字幕(英語)を、指定した言語(ja, esなど)に翻訳します。
         const res = await fetch(`/api/transcript?videoId=${videoId}&lang=${lang}`);
         const data = await res.json();
         return { lang, data };
@@ -199,6 +229,12 @@ function HomeContent() {
 
   const handleWordClick = async (word: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    // 英語学習時以外は辞書機能はスキップ
+    if (userProfile.learning_target !== 'English') {
+      alert(`「${userProfile.learning_target}」学習時は辞書機能が使えません。`);
+      return;
+    }
+
     const clean = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase();
     setSelectedWord(clean); setDictData(null); setIsLoading(true);
     try {
@@ -245,19 +281,20 @@ function HomeContent() {
   return (
     <main className={`h-screen flex flex-col bg-gray-50 transition-colors duration-500 ${getThemeStyles()} overflow-hidden`}>
 
-      {/* ★修正: プレイスメントテストにスキップ機能を追加★ */}
       {showPlacementTest && userId && (
         <PlacementTest
           userId={userId}
           onComplete={() => setShowPlacementTest(false)}
-          onSkip={() => setShowPlacementTest(false)} // スキップ時は単に閉じる
+          onSkip={() => setShowPlacementTest(false)}
         />
       )}
 
       {/* ヘッダー */}
       <div className={`shrink-0 w-full flex flex-wrap justify-between items-center p-4 border-b ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
         <div className="flex items-center gap-4">
-          <h1 className={`text-xl font-bold ${isKids ? 'font-comic text-yellow-500' : ''}`}>{isKids ? '🐯 English' : 'My Dojo'}</h1>
+          <h1 className={`text-xl font-bold ${isKids ? 'font-comic text-yellow-500' : ''}`}>
+            {userProfile.learning_target} Dojo
+          </h1>
           <div className="scale-75 origin-left"><UserStatus level={userProfile.level} xp={userProfile.xp} nextLevelXp={userProfile.next_level_xp} /></div>
         </div>
         <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
@@ -269,17 +306,38 @@ function HomeContent() {
           <div className="bg-white p-6 rounded-xl max-w-sm w-full text-black shadow-2xl">
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">⚙️ 設定</h3><button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button></div>
             <div className="space-y-4">
+
+              {/* ★学習対象言語の切り替え ★ */}
+              <div>
+                <p className="mb-1 font-bold text-sm text-gray-500">学習対象</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {SUPPORTED_LANGUAGES.map(lang => (
+                    <button
+                      key={lang.code}
+                      onClick={() => handleTargetLanguageChange(lang.label.split(' ')[1] || lang.code)}
+                      className={`py-2 rounded-lg border font-bold text-sm transition 
+                          ${userProfile.learning_target === (lang.label.split(' ')[1] || lang.code) ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'hover:bg-gray-50'}`}
+                    >
+                      {lang.label.split(' ')[1] || lang.code}
+                    </button>
+                  ))}
+                  {/* 非言語系コンテンツの選択肢を追加 */}
+                  <button onClick={() => handleTargetLanguageChange('Sign Language')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Sign Language' ? 'bg-green-100 text-green-700' : 'hover:bg-gray-50'}`}>
+                    🤟 手話
+                  </button>
+                  <button onClick={() => handleTargetLanguageChange('Programming')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Programming' ? 'bg-red-100 text-red-700' : 'hover:bg-gray-50'}`}>
+                    💻 Code
+                  </button>
+                </div>
+              </div>
+
               <Link href="/dashboard" className="block w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-center py-3 rounded-lg font-bold shadow-md hover:opacity-90">
                 🏠 ダッシュボード
               </Link>
-              {/* ▼▼▼ 追加: 過去の日替わり一覧へ ▼▼▼ */}
               <Link href="/dashboard/archive" className="block w-full bg-gray-100 text-gray-700 text-center py-2 rounded-lg font-bold hover:bg-gray-200 text-sm">
-                📅 過去のピックアップ一覧
+                📅 過去のピックアップ
               </Link>
-              {/* ▲▲▲ 追加 ▲▲▲ */}
-
-              <div>
-                <p className="mb-1 font-bold text-sm text-gray-500">モード切替</p>
+              <div><p className="mb-1 font-bold text-sm text-gray-500">モード切替</p>
                 <div className="flex gap-2">
                   <button onClick={() => handleThemeChange('kids')} className={`flex-1 py-2 rounded-lg border font-bold text-sm ${userProfile.theme === 'kids' ? 'bg-yellow-100 border-yellow-400 text-yellow-700' : ''}`}>Kids</button>
                   <button onClick={() => handleThemeChange('student')} className={`flex-1 py-2 rounded-lg border font-bold text-sm ${userProfile.theme === 'student' ? 'bg-blue-100 border-blue-400 text-blue-700' : ''}`}>Std</button>
@@ -287,6 +345,7 @@ function HomeContent() {
                 </div>
               </div>
               <div><p className="mb-1 font-bold text-sm text-gray-500">目標</p><button onClick={handleGoalChange} className="w-full py-2 border rounded text-sm text-gray-700">🎯 {userProfile.goal || '設定'}</button></div>
+              <div><p className="mb-1 font-bold text-sm text-gray-500">名前</p><div className="flex gap-2"><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 border p-2 rounded text-black" /><button onClick={handleNameSave} className="bg-blue-600 text-white px-4 rounded font-bold text-sm">保存</button></div></div>
               <Link href="/inquiry" className="block w-full text-center text-blue-500 text-sm py-2 border rounded hover:bg-blue-50">📮 お問い合わせ</Link>
               <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 border rounded hover:bg-red-50">ログアウト</button>
             </div>
@@ -305,6 +364,7 @@ function HomeContent() {
 
       {/* === レイアウト本体 === */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
+        {/* スマホビュー */}
         <div className="md:hidden flex flex-col h-full w-full">
           <div className={`shrink-0 w-full bg-black transition-all duration-300 ${isAudioOnly ? 'h-12' : 'aspect-video'}`}>
             {isAudioOnly ? (
@@ -327,6 +387,7 @@ function HomeContent() {
                 </div>
                 {isLangMenuOpen && (
                   <div className="absolute right-0 top-8 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
+                    <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
                     <div className="space-y-1">
                       {SUPPORTED_LANGUAGES.map(lang => (
                         <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
@@ -351,7 +412,7 @@ function HomeContent() {
           </div>
         </div>
 
-        {/* PCビュー (ロジック重複のため省略せず記述) */}
+        {/* PCビュー */}
         <div className="hidden md:flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             {!isKids && userId && <Heatmap userId={userId} />}
@@ -376,6 +437,7 @@ function HomeContent() {
               </div>
               {isLangMenuOpen && (
                 <div className="absolute right-4 top-12 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
+                  <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
                   <div className="space-y-1">
                     {SUPPORTED_LANGUAGES.map(lang => (
                       <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
@@ -414,6 +476,8 @@ function HomeContent() {
         </>
       )}
       {isSearchOpen && <VideoSearchModal onClose={() => setIsSearchOpen(false)} onSelect={(id) => { setVideoId(id); setIsSearchOpen(false); setTimeout(() => loadVideo(id), 100); }} />}
+
+      {userId && <AIChatButton userId={userId} />}
     </main>
   );
 }
@@ -425,5 +489,4 @@ export default function Home() {
     </Suspense>
   );
 }
-
 

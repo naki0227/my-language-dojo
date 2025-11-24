@@ -7,32 +7,34 @@ import VideoSearchModal from '@/components/VideoSearchModal';
 import { useRouter } from 'next/navigation';
 
 type AdminComment = { id: number; user_id: string; username: string; content: string; video_id: string; created_at: string; likes: number; };
+type Inquiry = { id: number; category: string; message: string; created_at: string; is_read: boolean; };
 type Wordbook = { id: number; title: string; };
 
 export default function AdminPage() {
     const router = useRouter();
     const [isAdmin, setIsAdmin] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'textbook' | 'comments' | 'daily'>('textbook');
+    // ★修正: roadmapタブを追加
+    const [activeTab, setActiveTab] = useState<'textbook' | 'comments' | 'daily' | 'inquiry' | 'roadmap'>('textbook');
 
-    // 教科書 & 日替わり用
+    // 各種ステート
     const [topic, setTopic] = useState('');
     const [category, setCategory] = useState('jhs');
     const [content, setContent] = useState('');
     const [title, setTitle] = useState('');
     const [selectedWordbook, setSelectedWordbook] = useState<string>('');
     const [wordbooks, setWordbooks] = useState<Wordbook[]>([]);
-
-    // ★追加: 生成されたクイズデータを一時保存するState
     const [dailyQuiz, setDailyQuiz] = useState<any>(null);
-
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
-
-    // コメント管理用
     const [comments, setComments] = useState<AdminComment[]>([]);
-    const [isCommentLoading, setIsCommentLoading] = useState(false);
+    const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // ★追加: ロードマップ生成用ステート
+    const [roadmapLevel, setRoadmapLevel] = useState('A1');
+    const [roadmapQuery, setRoadmapQuery] = useState('');
 
     useEffect(() => {
         const checkPrivileges = async () => {
@@ -43,6 +45,7 @@ export default function AdminPage() {
                 setIsAdmin(true);
                 fetchComments();
                 fetchWordbooks();
+                fetchInquiries();
             } else {
                 alert('⛔️ 管理者権限がありません。');
                 router.push('/');
@@ -59,10 +62,22 @@ export default function AdminPage() {
     };
 
     const fetchComments = async () => {
-        setIsCommentLoading(true);
         const { data } = await supabase.from('comments').select('*').order('created_at', { ascending: false }).limit(50);
         if (data) setComments(data);
-        setIsCommentLoading(false);
+    };
+
+    const fetchInquiries = async () => {
+        const { data } = await supabase.from('inquiries').select('*').order('created_at', { ascending: false });
+        if (data) {
+            setInquiries(data);
+            setUnreadCount(data.filter((i: any) => !i.is_read).length);
+        }
+    };
+
+    const markAsRead = async (id: number) => {
+        await supabase.from('inquiries').update({ is_read: true }).eq('id', id);
+        setInquiries(inquiries.map(i => i.id === id ? { ...i, is_read: true } : i));
+        setUnreadCount(prev => Math.max(0, prev - 1));
     };
 
     const deleteComment = async (id: number) => {
@@ -102,40 +117,46 @@ export default function AdminPage() {
         finally { setIsGenerating(false); }
     };
 
-    // ★日替わりAI自動生成 (修正版)★
     const handleAiDailyPick = async () => {
         setIsGenerating(true);
         try {
             const res = await fetch('/api/ai/daily', { method: 'POST' });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
+            setTopic(data.videoId); setContent(data.message); setDailyQuiz(data.quiz);
+            alert(`AI選定完了！\nテーマ: ${data.topic}`);
+        } catch (e) { alert('AI選定失敗'); }
+        finally { setIsGenerating(false); }
+    };
 
-            setTopic(data.videoId); // 動画ID
-            setContent(data.message); // メッセージ
-            setDailyQuiz(data.quiz); // ★クイズデータも保存
+    const handleSaveDaily = async () => {
+        const { error } = await supabase.from('daily_picks').upsert([{
+            date: new Date().toISOString().split('T')[0],
+            video_id: topic, message: content, quiz_data: dailyQuiz
+        }], { onConflict: 'date' });
+        if (!error) alert('設定しました！'); else alert('エラー: ' + error.message);
+    };
 
-            alert(`AI選定完了！\nテーマ: ${data.topic}\nクイズ: ${data.quiz ? data.quiz.length : 0}問生成`);
-        } catch (e) {
-            alert('AI選定に失敗しました');
+    // ★追加: ロードマップ自動生成
+    const handleGenerateRoadmap = async () => {
+        setIsGenerating(true);
+        try {
+            const res = await fetch('/api/admin/roadmap', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: roadmapLevel, keywords: roadmapQuery }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            alert(`成功！ ${data.count}件の動画を ${roadmapLevel} に追加しました。`);
+        } catch (e: any) {
+            alert('エラー: ' + e.message);
         } finally {
             setIsGenerating(false);
         }
     };
 
-    // 日替わり保存
-    const handleSaveDaily = async () => {
-        const { error } = await supabase.from('daily_picks').upsert([{
-            date: new Date().toISOString().split('T')[0],
-            video_id: topic,
-            message: content,
-            quiz_data: dailyQuiz // ★クイズデータもDBに保存
-        }], { onConflict: 'date' });
-
-        if (!error) alert('本日のコンテンツを設定しました！');
-        else alert('エラー: ' + error.message);
-    };
-
-    // 教科書保存
     const handleSave = async () => {
         if (!title || !content) return;
         setIsSaving(true);
@@ -170,10 +191,17 @@ export default function AdminPage() {
                     <Link href="/" className="text-gray-400 hover:text-white border border-gray-600 px-3 py-1 rounded">Exit</Link>
                 </div>
 
-                <div className="flex gap-4 mb-8 border-b border-gray-700 pb-1">
-                    <button onClick={() => setActiveTab('textbook')} className={`pb-2 px-4 font-bold transition ${activeTab === 'textbook' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>📖 教科書ジェネレーター</button>
-                    <button onClick={() => setActiveTab('comments')} className={`pb-2 px-4 font-bold transition ${activeTab === 'comments' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500 hover:text-gray-300'}`}>💬 コメント管理</button>
-                    <button onClick={() => setActiveTab('daily')} className={`pb-2 px-4 font-bold transition ${activeTab === 'daily' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500 hover:text-gray-300'}`}>📅 日替わり設定</button>
+                <div className="flex gap-4 mb-8 border-b border-gray-700 pb-1 overflow-x-auto">
+                    <button onClick={() => setActiveTab('textbook')} className={`pb-2 px-4 font-bold transition whitespace-nowrap ${activeTab === 'textbook' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500'}`}>📖 教科書</button>
+                    <button onClick={() => setActiveTab('comments')} className={`pb-2 px-4 font-bold transition whitespace-nowrap ${activeTab === 'comments' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500'}`}>💬 コメント</button>
+                    <button onClick={() => setActiveTab('daily')} className={`pb-2 px-4 font-bold transition whitespace-nowrap ${activeTab === 'daily' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500'}`}>📅 日替わり</button>
+                    <button onClick={() => setActiveTab('inquiry')} className={`pb-2 px-4 font-bold transition whitespace-nowrap flex items-center gap-2 ${activeTab === 'inquiry' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}>
+                        📮 受信箱 {unreadCount > 0 && <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>}
+                    </button>
+                    {/* ▼▼▼ 追加: ロードマップ管理タブ ▼▼▼ */}
+                    <button onClick={() => setActiveTab('roadmap')} className={`pb-2 px-4 font-bold transition whitespace-nowrap ${activeTab === 'roadmap' ? 'text-purple-400 border-b-2 border-purple-400' : 'text-gray-500'}`}>
+                        🗺️ ロードマップ
+                    </button>
                 </div>
 
                 {activeTab === 'textbook' && (
@@ -198,7 +226,6 @@ export default function AdminPage() {
                                 {isGenerating ? 'Thinking...' : '🎲 テーマおまかせ生成'}
                             </button>
                         </div>
-
                         <div className="bg-gray-800 p-6 rounded-xl space-y-4 flex flex-col border border-gray-700">
                             <h2 className="font-bold text-xl text-green-400 mb-2">2. Publish</h2>
                             <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="w-full p-3 rounded bg-gray-900 border border-gray-600 font-bold" />
@@ -233,35 +260,85 @@ export default function AdminPage() {
 
                 {activeTab === 'daily' && (
                     <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 animate-fade-in">
-                        <h2 className="font-bold text-xl mb-4 text-yellow-400">📅 Today's Pick Configuration</h2>
+                        <h2 className="font-bold text-xl mb-4 text-yellow-400">📅 Today's Pick</h2>
                         <div className="space-y-4">
                             <button onClick={handleAiDailyPick} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mb-4 flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-600' : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:opacity-90'}`}>
-                                {isGenerating ? 'AI is thinking...' : '🤖 AI Auto-Select & Quiz Gen'}
+                                {isGenerating ? 'AI is thinking...' : '🤖 AI Auto-Select'}
                             </button>
-
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-1">Today's Video ID</label>
-                                <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="YouTube ID" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
-                            </div>
-                            <div>
-                                <label className="block text-sm text-gray-400 mb-1">Message</label>
-                                <input type="text" value={content} onChange={(e) => setContent(e.target.value)} placeholder="今日のひとこと" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
-                            </div>
-
-                            {/* クイズプレビュー */}
-                            {dailyQuiz && (
-                                <div className="bg-gray-700 p-3 rounded text-sm text-gray-300">
-                                    <p className="font-bold text-green-400 mb-1">✅ Generated Quiz ({dailyQuiz.length} questions)</p>
-                                    <ul className="list-disc pl-4">
-                                        {dailyQuiz.map((q: any, i: number) => <li key={i}>{q.q}</li>)}
-                                    </ul>
-                                </div>
-                            )}
-
+                            <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="YouTube ID" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
+                            <input type="text" value={content} onChange={(e) => setContent(e.target.value)} placeholder="メッセージ" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
                             <button onClick={handleSaveDaily} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold">Set as Today's Pick</button>
                         </div>
                     </div>
                 )}
+
+                {activeTab === 'inquiry' && (
+                    <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden">
+                        <div className="divide-y divide-gray-700 max-h-[70vh] overflow-y-auto">
+                            {inquiries.map((item) => (
+                                <div key={item.id} className={`p-6 transition ${!item.is_read ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-gray-800'}`}>
+                                    <div className="flex justify-between items-start mb-2">
+                                        <div className="flex gap-2 items-center">
+                                            <span className={`text-xs px-2 py-1 rounded font-bold uppercase ${item.category === 'bug' ? 'bg-red-900 text-red-200' : 'bg-blue-900 text-blue-200'}`}>{item.category}</span>
+                                            <span className="text-xs text-gray-400">{new Date(item.created_at).toLocaleString()}</span>
+                                            {!item.is_read && <span className="text-xs bg-green-600 text-white px-2 rounded-full">New!</span>}
+                                        </div>
+                                        {!item.is_read && <button onClick={() => markAsRead(item.id)} className="text-xs border border-gray-500 px-2 py-1 rounded hover:bg-gray-600">Mark as Read</button>}
+                                    </div>
+                                    <p className="text-gray-200 whitespace-pre-wrap">{item.message}</p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {/* ▼▼▼ 追加: ロードマップ自動生成タブ ▼▼▼ */}
+                {activeTab === 'roadmap' && (
+                    <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 animate-fade-in">
+                        <h2 className="font-bold text-xl mb-4 text-purple-400">🗺️ Roadmap Auto-Generator</h2>
+                        <p className="text-gray-400 mb-6 text-sm">YouTubeから大量の動画を検索し、指定したレベルのロードマップに一括追加します。</p>
+
+                        <div className="space-y-6">
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Target Level</label>
+                                <select
+                                    value={roadmapLevel}
+                                    onChange={(e) => setRoadmapLevel(e.target.value)}
+                                    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none"
+                                >
+                                    <option value="A1">A1 (初級)</option>
+                                    <option value="A2">A2 (初中級)</option>
+                                    <option value="B1">B1 (中級)</option>
+                                    <option value="B2">B2 (中上級)</option>
+                                    <option value="C1">C1 (上級)</option>
+                                    <option value="C2">C2 (マスター)</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="block text-sm text-gray-400 mb-2">Search Keywords (Optional)</label>
+                                <input
+                                    type="text"
+                                    value={roadmapQuery}
+                                    onChange={(e) => setRoadmapQuery(e.target.value)}
+                                    placeholder="空欄ならデフォルト (例: English A1 stories)"
+                                    className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none"
+                                />
+                            </div>
+
+                            <button
+                                onClick={handleGenerateRoadmap}
+                                disabled={isGenerating}
+                                className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg transition ${isGenerating ? 'bg-gray-600 cursor-not-allowed' : 'bg-purple-600 hover:bg-purple-500'}`}
+                            >
+                                {isGenerating ? 'Generating...' : '🚀 Generate & Add 20 Videos'}
+                            </button>
+                            <p className="text-center text-xs text-gray-500 mt-2">※一度に約20件追加されます。100件にするには5回押してください。</p>
+                        </div>
+                    </div>
+                )}
+                {/* ▲▲▲ 追加ここまで ▲▲▲ */}
+
             </div>
             {isSearchOpen && <VideoSearchModal onClose={() => setIsSearchOpen(false)} onSelect={(id) => {
                 if (activeTab === 'daily') setTopic(id);

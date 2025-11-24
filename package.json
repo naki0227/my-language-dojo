@@ -20,6 +20,7 @@
     "react-dom": "19.2.0",
     "react-markdown": "^10.1.0",
     "react-youtube": "^10.1.0",
+    "recharts": "^3.5.0",
     "youtubei.js": "^16.0.1"
   },
   "devDependencies": {
