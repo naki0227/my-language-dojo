@@ -23,11 +23,17 @@ export default function TextbookList() {
             setIsLoading(true);
             const { data } = await supabase
                 .from('textbooks')
-                .select('*')
-                .order('title', { ascending: true });
+                .select('*'); // ここでは並び替えず、全部取ってくる
+
             if (data) {
-                setAllBooks(data);
-                setFilteredBooks(data);
+                // ▼▼▼ ここで「自然順ソート」を行う修正 ▼▼▼
+                // "numeric: true" オプションのおかげで、Vol.1, Vol.2, ..., Vol.10 と正しく並びます
+                const sortedData = data.sort((a, b) => {
+                    return new Intl.Collator('ja', { numeric: true }).compare(a.title, b.title);
+                });
+
+                setAllBooks(sortedData);
+                setFilteredBooks(sortedData);
             }
             setIsLoading(false);
         };
@@ -45,15 +51,14 @@ export default function TextbookList() {
 
         if (activeCategory !== 'all') {
             result = result.filter(book => {
-                if (activeCategory === 'jhs') return book.title.includes('中学英語');
-                if (activeCategory === 'hs') return book.title.includes('高校英語');
-                if (activeCategory === 'eiken') return book.title.includes('英検'); // 英検カテゴリを追加
+                if (activeCategory === 'jhs') return book.title.includes('中学');
+                if (activeCategory === 'hs') return book.title.includes('高校');
+                if (activeCategory === 'eiken') return book.title.includes('英検');
                 if (activeCategory === 'business') return book.title.includes('ビジネス');
 
-                // 「文法トピック」はその他すべて
                 if (activeCategory === 'grammar') {
-                    return !book.title.includes('中学英語') &&
-                        !book.title.includes('高校英語') &&
+                    return !book.title.includes('中学') &&
+                        !book.title.includes('高校') &&
                         !book.title.includes('英検') &&
                         !book.title.includes('ビジネス');
                 }
@@ -87,11 +92,11 @@ export default function TextbookList() {
                     />
                 </div>
 
-                {/* カテゴリタブ (英検を追加) */}
+                {/* カテゴリタブ */}
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {[
                         { id: 'all', label: 'すべて', icon: '📚', color: 'bg-gray-600' },
-                        { id: 'eiken', label: '英検対策', icon: '💮', color: 'bg-red-500' }, // 追加
+                        { id: 'eiken', label: '英検対策', icon: '💮', color: 'bg-red-500' },
                         { id: 'jhs', label: '中学英語', icon: '🏆', color: 'bg-yellow-500' },
                         { id: 'hs', label: '高校英語', icon: '🎓', color: 'bg-indigo-500' },
                         { id: 'business', label: 'ビジネス', icon: '💼', color: 'bg-blue-500' },
@@ -126,7 +131,7 @@ export default function TextbookList() {
 
                             if (book.title.includes('中学')) { themeColor = 'bg-yellow-100 text-yellow-600'; badge = 'JHS'; }
                             else if (book.title.includes('高校')) { themeColor = 'bg-indigo-100 text-indigo-600'; badge = 'High School'; }
-                            else if (book.title.includes('英検')) { themeColor = 'bg-red-100 text-red-600'; badge = 'EIKEN'; } // 英検用デザイン
+                            else if (book.title.includes('英検')) { themeColor = 'bg-red-100 text-red-600'; badge = 'EIKEN'; }
                             else if (book.title.includes('ビジネス')) { themeColor = 'bg-blue-100 text-blue-600'; badge = 'Business'; }
 
                             return (
