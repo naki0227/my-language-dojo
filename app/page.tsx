@@ -7,6 +7,8 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import UserStatus from '@/components/UserStatus';
+import CommentSection from '@/components/CommentSection';
+import { Comme } from 'next/font/google';
 
 // --- 型定義 ---
 type Subtitle = {
@@ -314,6 +316,8 @@ function HomeContent() {
               }
             />
           </div>
+          {/* コメント掲示板 */}
+          <CommentSection videoId={videoId} />
         </div>
 
         {/* 字幕リストエリア */}
