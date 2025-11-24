@@ -1,9 +1,9 @@
-// app/vocab/page.tsx
 'use client';
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 type Vocab = {
     id: number;
@@ -13,20 +13,30 @@ type Vocab = {
 };
 
 export default function VocabPage() {
+    const router = useRouter();
     const [vocabList, setVocabList] = useState<Vocab[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    // 初回読み込み
     useEffect(() => {
         fetchVocab();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchVocab = async () => {
         setIsLoading(true);
-        // created_at の新しい順 (desc) で取得
+
+        // 1. ログインチェック
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+            router.push('/auth');
+            return;
+        }
+
+        // 2. 自分のデータ(user_id)だけを取得
         const { data, error } = await supabase
             .from('vocab')
             .select('*')
+            .eq('user_id', session.user.id) // ★ここが重要！
             .order('created_at', { ascending: false });
 
         if (error) {
@@ -38,10 +48,8 @@ export default function VocabPage() {
         setIsLoading(false);
     };
 
-    // 削除機能
     const handleDelete = async (id: number) => {
-        const confirmDelete = confirm('本当に削除しますか？');
-        if (!confirmDelete) return;
+        if (!confirm('本当に削除しますか？')) return;
 
         const { error } = await supabase
             .from('vocab')
@@ -51,7 +59,6 @@ export default function VocabPage() {
         if (error) {
             alert('削除に失敗しました');
         } else {
-            // 画面からも消す
             setVocabList(vocabList.filter((v) => v.id !== id));
         }
     };
