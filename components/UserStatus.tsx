@@ -2,7 +2,7 @@
 'use client';
 
 type Props = {
-    level: number;
+    level: string;
     xp: number;
     nextLevelXp: number;
 };

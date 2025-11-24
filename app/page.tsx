@@ -18,25 +18,33 @@ import AIChatButton from '@/components/AIChatButton';
 type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
 type DictionaryData = {
   word: string; phonetic?: string; audio?: string; translation?: string;
-  meanings: { partOfSpeech: string; definitions: { definition: string }[]; }[];
+  sourceLang?: string;
+  meanings?: { partOfSpeech: string; definitions: { definition: string }[]; }[];
+};
+type UserLevelData = {
+  user_id: string;
+  subject: string;
+  level_result: string;
+  score: number;
+  xp: number;
 };
 type UserProfile = {
-  id: string; level: number; xp: number; next_level_xp: number;
+  id: string; level: number; xp: number; next_level_xp: 100;
   theme: 'kids' | 'student' | 'pro';
   goal: string;
   placement_test_done: boolean;
-  learning_target: string; // 学習対象言語 (例: Spanish)
+  learning_target: string;
 };
 
 const SUPPORTED_LANGUAGES = [
-  { code: 'en', label: '🇬🇧 English' },
-  { code: 'es', label: '🇪🇸 Spanish' },
-  { code: 'fr', label: '🇫🇷 French' },
-  { code: 'zh', label: '🇨🇳 Chinese' },
-  { code: 'ko', label: '🇰🇷 Korean' },
-  { code: 'pt', label: '🇧🇷 Portuguese' },
-  { code: 'ar', label: '🇸🇦 Arabic' },
-  { code: 'ru', label: '🇷🇺 Russian' },
+  { code: 'en', label: '🇬🇧 English' }, { code: 'es', label: '🇪🇸 Spanish' }, { code: 'fr', label: '🇫🇷 French' },
+  { code: 'zh', label: '🇨🇳 Chinese' }, { code: 'ko', label: '🇰🇷 Korean' }, { code: 'pt', label: '🇧🇷 Portuguese' },
+  { code: 'ar', label: '🇸🇦 Arabic' }, { code: 'ru', label: '🇷🇺 Russian' },
+];
+
+const CEFR_LEVELS = [
+  'A1 (Beginner)', 'A2 (Elementary)', 'B1 (Intermediate)', 'B2 (Upper Intermediate)',
+  'C1 (Advanced)', 'C2 (Master)'
 ];
 
 function HomeContent() {
@@ -50,21 +58,21 @@ function HomeContent() {
     id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English'
   });
 
+  const [currentLevelData, setCurrentLevelData] = useState<UserLevelData>({
+    user_id: '', subject: 'English', level_result: 'A1 (Beginner)', score: 0, xp: 0
+  });
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
-
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [player, setPlayer] = useState<YouTubePlayer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
-
   const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
-
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [dictData, setDictData] = useState<DictionaryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,6 +80,8 @@ function HomeContent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [manualTargetText, setManualTargetText] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+
+  const XP_CAP = 1000;
 
   const getThemeStyles = () => {
     switch (userProfile.theme) {
@@ -94,12 +104,26 @@ function HomeContent() {
   }, []);
 
   const fetchProfile = async (uid: string) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (data) {
-      setUserProfile(data);
-      setUsername(data.username || 'Hero');
-      setEditName(data.username || 'Hero');
-      if (data.placement_test_done === false) setShowPlacementTest(true);
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', uid).single();
+    if (profileData) {
+      setUserProfile(profileData as UserProfile);
+      setUsername(profileData.username || 'Hero');
+      setEditName(profileData.username || 'Hero');
+      if (profileData.placement_test_done === false) setShowPlacementTest(true);
+
+      const { data: levelData } = await supabase
+        .from('user_levels')
+        .select('*')
+        .match({ user_id: uid, subject: profileData.learning_target })
+        .single();
+
+      const initialLevel = { user_id: uid, subject: profileData.learning_target, level_result: 'A1 (Beginner)', score: 0, xp: 0 };
+      if (levelData) {
+        setCurrentLevelData(levelData as UserLevelData);
+      } else {
+        await supabase.from('user_levels').insert(initialLevel);
+        setCurrentLevelData(initialLevel as UserLevelData);
+      }
     }
   };
 
@@ -113,30 +137,32 @@ function HomeContent() {
 
   const addXp = async (amount: number) => {
     if (!userId) return;
-    const { data: current } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    const { data: current } = await supabase.from('user_levels').select('xp').match({ user_id: userId, subject: userProfile.learning_target }).single();
     if (!current) return;
-    let newXp = current.xp + amount;
-    let newLevel = current.level;
-    let newNextXp = current.next_level_xp;
-    let leveledUp = false;
-    if (newXp >= newNextXp) { newXp -= newNextXp; newLevel += 1; newNextXp = Math.floor(newNextXp * 1.2); leveledUp = true; }
-    await supabase.from('profiles').update({ level: newLevel, xp: newXp, next_level_xp: newNextXp }).eq('id', userId);
-    setUserProfile({ ...current, level: newLevel, xp: newXp, next_level_xp: newNextXp });
-    if (leveledUp) alert(`🎉 LEVEL UP! Lv.${newLevel}!`);
+
+    const newXp = current.xp + amount;
+
+    await supabase
+      .from('user_levels')
+      .update({ xp: newXp })
+      .match({ user_id: userId, subject: userProfile.learning_target });
+
+    setCurrentLevelData(prev => ({ ...prev, xp: newXp }));
+
     logStudyActivity();
   };
 
-  // ★学習対象言語の更新 (プロフィールに反映)
   const handleTargetLanguageChange = async (newLang: string) => {
     if (!userId) return;
     try {
-      const { error } = await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
-      if (error) throw error;
-      setUserProfile(prev => ({ ...prev, learning_target: newLang }));
-      alert(`学習対象を ${newLang} に変更しました！`);
-      setIsSettingsOpen(false);
+      await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
+      window.location.reload();
     } catch (e) { alert('設定の保存に失敗しました'); }
   };
+
+  // ★修正: 手動レベル更新関数を削除 (テストのみでレベルを更新するため)
+  // const handleManualLevelChange = async (newLevel: string) => { ... }
+
 
   const handleThemeChange = async (newTheme: any) => {
     if (!userId) return;
@@ -159,11 +185,6 @@ function HomeContent() {
     setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
     setSelectedLangs([]);
     try {
-      // 辞書APIが英語前提なので、対象言語が英語でない場合はエラーを出して終了させる
-      if (userProfile.learning_target !== 'English') {
-        alert(`現在、AI採点と言葉のタップ機能は「English」専用です。学習対象言語を「English」に変更するか、非言語系コンテンツに切り替えてください。`);
-      }
-
       const res = await fetch(`/api/transcript?videoId=${targetId}`);
       const data = await res.json();
       if (data.error) alert(`字幕エラー: ${data.error}`);
@@ -182,7 +203,6 @@ function HomeContent() {
       let updatedSubtitles = [...subtitles];
       const promises = langsToFetch.map(async (lang) => {
         if (updatedSubtitles.length > 0 && updatedSubtitles[0].translations[lang]) return null;
-        // 翻訳APIは、学習対象言語の字幕(英語)を、指定した言語(ja, esなど)に翻訳します。
         const res = await fetch(`/api/transcript?videoId=${videoId}&lang=${lang}`);
         const data = await res.json();
         return { lang, data };
@@ -229,25 +249,29 @@ function HomeContent() {
 
   const handleWordClick = async (word: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // 英語学習時以外は辞書機能はスキップ
+    const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase();
+
     if (userProfile.learning_target !== 'English') {
-      alert(`「${userProfile.learning_target}」学習時は辞書機能が使えません。`);
+      alert(`「${userProfile.learning_target}」のタップ辞書はAI解析中です。`);
       return;
     }
 
-    const clean = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase();
-    setSelectedWord(clean); setDictData(null); setIsLoading(true);
+    setSelectedWord(cleanWord); setIsLoading(true);
     try {
       const [dRes, tRes] = await Promise.all([
-        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${clean}`),
-        fetch(`https://api.mymemory.translated.net/get?q=${clean}&langpair=en|ja`)
+        fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${cleanWord}`),
+        fetch(`https://api.mymemory.translated.net/get?q=${cleanWord}&langpair=en|ja`)
       ]);
       let dEntry = null, trans = "";
       if (dRes.ok) { const d = await dRes.json(); dEntry = d[0]; }
       if (tRes.ok) { const d = await tRes.json(); trans = d.responseData.translatedText; }
       const audio = dEntry?.phonetics.find((p: any) => p.audio)?.audio;
-      setDictData({ word: clean, phonetic: dEntry?.phonetic, audio, translation: trans, meanings: dEntry?.meanings.slice(0, 2) || [] });
-    } catch { setDictData({ word: clean, meanings: [], translation: "エラー" }); }
+      setDictData({
+        word: cleanWord, phonetic: dEntry?.phonetic, audio,
+        translation: trans, meanings: dEntry?.meanings.slice(0, 2),
+        sourceLang: 'English'
+      });
+    } catch { setDictData({ word: cleanWord, translation: "エラー", sourceLang: 'English' }); }
     finally { setIsLoading(false); }
   };
 
@@ -295,7 +319,9 @@ function HomeContent() {
           <h1 className={`text-xl font-bold ${isKids ? 'font-comic text-yellow-500' : ''}`}>
             {userProfile.learning_target} Dojo
           </h1>
-          <div className="scale-75 origin-left"><UserStatus level={userProfile.level} xp={userProfile.xp} nextLevelXp={userProfile.next_level_xp} /></div>
+          <div className="scale-75 origin-left">
+            <UserStatus level={currentLevelData.level_result.split(' ')[0] || 'A1'} xp={currentLevelData.xp} nextLevelXp={XP_CAP} />
+          </div>
         </div>
         <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
       </div>
@@ -307,7 +333,9 @@ function HomeContent() {
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">⚙️ 設定</h3><button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button></div>
             <div className="space-y-4">
 
-              {/* ★学習対象言語の切り替え ★ */}
+              {/* ★手動設定ドロップダウンを削除し、言語切り替えに統一しました★ */}
+
+              {/* 学習対象の切り替え */}
               <div>
                 <p className="mb-1 font-bold text-sm text-gray-500">学習対象</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -318,10 +346,9 @@ function HomeContent() {
                       className={`py-2 rounded-lg border font-bold text-sm transition 
                           ${userProfile.learning_target === (lang.label.split(' ')[1] || lang.code) ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'hover:bg-gray-50'}`}
                     >
-                      {lang.label.split(' ')[1] || lang.code}
+                      {lang.label}
                     </button>
                   ))}
-                  {/* 非言語系コンテンツの選択肢を追加 */}
                   <button onClick={() => handleTargetLanguageChange('Sign Language')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Sign Language' ? 'bg-green-100 text-green-700' : 'hover:bg-gray-50'}`}>
                     🤟 手話
                   </button>
@@ -450,7 +477,7 @@ function HomeContent() {
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-2">
               {subtitles.map((sub, i) => (
-                <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-lg leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
+                <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-lg leading-relaxed transition-colors border-b ${isPro ? 'bg-gray-700 hover:bg-gray-700 text-gray-300' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
                   <div>{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
                   {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-base text-gray-500 mt-2 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-2">{lang.toUpperCase()}</span>{sub.translations[lang]}</div>) : null))}
                 </div>
@@ -467,8 +494,21 @@ function HomeContent() {
             <div className="flex justify-between items-start mb-4 border-b pb-2"><h3 className="text-3xl font-bold capitalize">{selectedWord}</h3><button onClick={() => setSelectedWord(null)} className="text-2xl opacity-50">×</button></div>
             {isLoading ? <p>Loading...</p> : dictData ? (
               <div className="space-y-4">
+                <p className="text-sm font-bold text-gray-500">
+                  {dictData.sourceLang} → 日本語翻訳
+                  {dictData.sourceLang === 'English' && dictData.audio && (
+                    <button onClick={playAudio} className="ml-2 text-blue-500 hover:text-blue-600 text-base">🔊</button>
+                  )}
+                </p>
                 <p className="text-xl font-bold">{dictData.translation}</p>
-                {dictData.meanings.length > 0 && (<div className="pr-2 text-sm opacity-80">{dictData.meanings[0].definitions[0].definition}</div>)}
+
+                {dictData.sourceLang === 'English' && dictData.meanings && dictData.meanings.length > 0 && dictData.meanings[0].definitions && dictData.meanings[0].definitions.length > 0 && (
+                  <div className="border-t pt-2 mt-2">
+                    <p className="text-xs font-bold text-gray-400">English Definition:</p>
+                    <p className="text-sm opacity-80">{dictData.meanings[0].definitions[0].definition}</p>
+                  </div>
+                )}
+
                 <button onClick={handleSaveWord} disabled={isSaving} className={`w-full py-3 rounded-lg font-bold shadow-lg ${isSaving ? 'bg-gray-500' : 'bg-green-600 text-white'}`}>{isSaving ? 'Saving...' : '＋ Save'}</button>
               </div>
             ) : <p>No data</p>}

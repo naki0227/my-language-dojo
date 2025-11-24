@@ -9,14 +9,16 @@ type Question = {
     question: string;
     options: string[];
     answer_index: number;
+    subject: string;
 };
 
 type Props = {
     userId: string;
+    currentSubject: string; // ★現在の学習対象言語
     onClose: () => void;
 };
 
-export default function ProficiencyTest({ userId, onClose }: Props) {
+export default function ProficiencyTest({ userId, currentSubject, onClose }: Props) {
     const [questions, setQuestions] = useState<Question[]>([]);
     const [currentIdx, setCurrentIdx] = useState(0);
     const [answers, setAnswers] = useState<number[]>([]);
@@ -26,19 +28,22 @@ export default function ProficiencyTest({ userId, onClose }: Props) {
     const [score, setScore] = useState(0);
     const [newLevel, setNewLevel] = useState('');
 
-    // 問題を取得 (ランダムに20問)
+    // 問題を取得 (現在の言語からランダムに20問)
     useEffect(() => {
         const fetchQuestions = async () => {
-            // 注意: 本来はRPC(Stored Procedure)でランダム取得するのが高速ですが、
-            // 簡易的にクライアントでシャッフルします。
-            const { data } = await supabase.from('proficiency_questions').select('*');
-            if (data) {
-                const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 20);
-                setQuestions(shuffled);
+            // 現在の言語の問題を取得
+            const { data } = await supabase.from('proficiency_questions').select('*').eq('subject', currentSubject);
+
+            if (data && data.length > 0) {
+                const shuffled = data.sort(() => 0.5 - Math.random()).slice(0, 20); // 20問に制限
+                setQuestions(shuffled as Question[]);
+            } else {
+                alert(`現在、${currentSubject} のテスト問題データがありません。`);
+                onClose();
             }
         };
         fetchQuestions();
-    }, []);
+    }, [currentSubject, onClose]);
 
     // タイマー
     useEffect(() => {
@@ -53,55 +58,64 @@ export default function ProficiencyTest({ userId, onClose }: Props) {
     }, [isStarted, isFinished, timeLeft]);
 
     const handleAnswer = (choiceIndex: number) => {
+        if (answers[currentIdx] !== undefined) return;
+
         const newAnswers = [...answers];
         newAnswers[currentIdx] = choiceIndex;
         setAnswers(newAnswers);
 
         if (currentIdx < questions.length - 1) {
-            setCurrentIdx(currentIdx + 1);
+            setTimeout(() => setCurrentIdx(currentIdx + 1), 300);
         } else {
             finishTest(newAnswers);
         }
     };
 
+    const calculateLevel = (score: number) => {
+        if (score >= 90) return 'C2 (Master)';
+        if (score >= 80) return 'C1 (Advanced)';
+        if (score >= 60) return 'B2 (Upper Intermediate)';
+        if (score >= 40) return 'B1 (Intermediate)';
+        if (score >= 20) return 'A2 (Elementary)';
+        return 'A1 (Beginner)';
+    };
+
     const finishTest = async (finalAnswers = answers) => {
         setIsFinished(true);
 
-        // 採点
         let rawScore = 0;
         questions.forEach((q, i) => {
             if (finalAnswers[i] === q.answer_index) rawScore++;
         });
 
-        // 100点満点に換算
         const finalScore = Math.round((rawScore / questions.length) * 100);
+        const calculatedLevel = calculateLevel(finalScore);
+
         setScore(finalScore);
+        setNewLevel(calculatedLevel);
 
-        // レベル判定
-        let level = 'A1 (Beginner)';
-        if (finalScore >= 90) level = 'C2 (Master)';
-        else if (finalScore >= 80) level = 'C1 (Advanced)';
-        else if (finalScore >= 60) level = 'B2 (Upper Intermediate)';
-        else if (finalScore >= 40) level = 'B1 (Intermediate)';
-        else if (finalScore >= 20) level = 'A2 (Elementary)';
-
-        setNewLevel(level);
-
-        // 結果保存
+        // 1. 結果保存 (test_results)
         await supabase.from('test_results').insert([{
             user_id: userId,
+            subject: currentSubject, // ★言語を保存
             score: finalScore,
-            level_result: level
+            level_result: calculatedLevel
         }]);
 
-        // 実績解除チェック (クイズ王)
+        // 2. ユーザーレベルを更新 (user_levels)
+        await supabase.from('user_levels').upsert({
+            user_id: userId,
+            subject: currentSubject,
+            score: finalScore,
+            level_result: calculatedLevel
+        }, { onConflict: 'user_id, subject' });
+
+
+        // 3. 実績解除チェック (クイズ王)
         if (finalScore >= 90) {
             const { data: ach } = await supabase.from('achievements').select('id').eq('id', 'quiz_master').single();
             if (ach) {
-                await supabase.from('user_achievements').upsert(
-                    { user_id: userId, achievement_id: ach.id },
-                    { onConflict: 'user_id, achievement_id' }
-                );
+                await supabase.from('user_achievements').upsert({ user_id: userId, achievement_id: ach.id }, { onConflict: 'user_id, achievement_id' });
             }
         }
     };
@@ -112,15 +126,18 @@ export default function ProficiencyTest({ userId, onClose }: Props) {
         return `${m}:${sec.toString().padStart(2, '0')}`;
     };
 
+    if (questions.length === 0 && !isStarted) {
+        return <div className="p-10 text-center text-gray-500">問題データをロード中...</div>;
+    }
+
     if (!isStarted) {
         return (
             <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4">
                 <div className="bg-white max-w-md w-full p-8 rounded-2xl text-center animate-bounce-in">
-                    <h1 className="text-3xl font-black text-blue-600 mb-4">🔥 実力診断テスト</h1>
+                    <h1 className="text-3xl font-black text-blue-600 mb-4">🔥 {currentSubject} 実力診断</h1>
                     <p className="text-gray-600 mb-6">
                         全{questions.length}問 / 制限時間10分<br />
-                        あなたの英語力を測定し、レベルを更新します。<br />
-                        <span className="text-xs text-gray-400">※一度受けると結果が記録されます</span>
+                        このテスト結果であなたの学習レベルが決定します。
                     </p>
                     <div className="flex gap-4 justify-center">
                         <button onClick={onClose} className="text-gray-500 font-bold px-4">あとで</button>
@@ -148,10 +165,10 @@ export default function ProficiencyTest({ userId, onClose }: Props) {
     }
 
     const q = questions[currentIdx];
+    const answered = answers[currentIdx] !== undefined;
 
     return (
         <div className="fixed inset-0 bg-gray-100 z-[100] flex flex-col items-center justify-center p-4">
-            {/* ヘッダー */}
             <div className="w-full max-w-2xl flex justify-between items-center mb-8">
                 <div className="text-xl font-bold text-gray-500">Q{currentIdx + 1} <span className="text-sm text-gray-300">/ {questions.length}</span></div>
                 <div className={`text-xl font-mono font-bold ${timeLeft < 60 ? 'text-red-500 animate-pulse' : 'text-gray-700'}`}>
@@ -159,25 +176,44 @@ export default function ProficiencyTest({ userId, onClose }: Props) {
                 </div>
             </div>
 
-            {/* 問題カード */}
             <div className="w-full max-w-2xl bg-white p-8 rounded-2xl shadow-xl mb-8">
-                <span className="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded mb-4 uppercase">{q.category}</span>
+                <span className="inline-block bg-gray-100 text-gray-500 text-xs px-2 py-1 rounded mb-4 uppercase">{q.category} / {q.subject}</span>
                 <h2 className="text-xl md:text-2xl font-bold text-gray-800 leading-relaxed whitespace-pre-wrap">
                     {q.question}
                 </h2>
             </div>
 
-            {/* 選択肢 */}
             <div className="w-full max-w-2xl grid gap-3">
                 {q.options.map((opt, i) => (
                     <button
                         key={i}
                         onClick={() => handleAnswer(i)}
-                        className="w-full bg-white border-2 border-gray-200 p-4 rounded-xl text-left font-bold text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition active:scale-95"
+                        disabled={answered}
+                        className={`w-full bg-white border-2 border-gray-200 p-4 rounded-xl text-left font-bold text-gray-700 transition
+              ${answered ? (i === q.answer_index ? 'border-green-500 bg-green-100' : (i === answers[currentIdx] ? 'border-red-500 bg-red-100' : 'opacity-50')) : 'hover:border-blue-500 hover:bg-blue-50'}
+            `}
                     >
                         {opt}
                     </button>
                 ))}
+            </div>
+
+            {/* 任意でスキップ/戻るボタン */}
+            <div className="w-full max-w-2xl flex justify-between mt-6">
+                <button
+                    onClick={() => setCurrentIdx(Math.max(0, currentIdx - 1))}
+                    disabled={currentIdx === 0}
+                    className="text-gray-500 text-sm hover:underline"
+                >
+                    ← 前の問題へ
+                </button>
+                <button
+                    onClick={() => setCurrentIdx(Math.min(questions.length - 1, currentIdx + 1))}
+                    disabled={currentIdx === questions.length - 1 || !answered}
+                    className="text-blue-600 text-sm font-bold"
+                >
+                    {currentIdx === questions.length - 1 ? '完了' : '次の問題へ →'}
+                </button>
             </div>
         </div>
     );

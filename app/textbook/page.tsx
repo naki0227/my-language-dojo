@@ -3,43 +3,64 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useCallback } from 'react'; // useCallbackを使用
 
 type Textbook = {
     id: number;
     title: string;
     created_at: string;
+    subject: string; // 対象言語
 };
 
 export default function TextbookList() {
+    const router = useRouter();
     const [allBooks, setAllBooks] = useState<Textbook[]>([]);
     const [filteredBooks, setFilteredBooks] = useState<Textbook[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const [searchQuery, setSearchQuery] = useState('');
     const [activeCategory, setActiveCategory] = useState<string>('all');
+    const [targetSubject, setTargetSubject] = useState('English');
 
-    useEffect(() => {
-        const fetchBooks = async () => {
-            setIsLoading(true);
-            const { data } = await supabase
-                .from('textbooks')
-                .select('*'); // ここでは並び替えず、全部取ってくる
+    // データ取得ロジック
+    const fetchBooks = useCallback(async (currentSubject: string) => {
+        setIsLoading(true);
+        // ユーザーの学習対象言語でフィルタリングしてデータを取得
+        const { data } = await supabase
+            .from('textbooks')
+            .select('*')
+            .eq('subject', currentSubject) // ★対象言語でフィルタ
+            .order('title', { ascending: true });
 
-            if (data) {
-                // ▼▼▼ ここで「自然順ソート」を行う修正 ▼▼▼
-                // "numeric: true" オプションのおかげで、Vol.1, Vol.2, ..., Vol.10 と正しく並びます
-                const sortedData = data.sort((a, b) => {
-                    return new Intl.Collator('ja', { numeric: true }).compare(a.title, b.title);
-                });
-
-                setAllBooks(sortedData);
-                setFilteredBooks(sortedData);
-            }
-            setIsLoading(false);
-        };
-        fetchBooks();
+        if (data) {
+            const sortedData = data.sort((a, b) => new Intl.Collator('ja', { numeric: true }).compare(a.title, b.title));
+            setAllBooks(sortedData);
+            setFilteredBooks(sortedData);
+        } else {
+            setAllBooks([]);
+            setFilteredBooks([]);
+        }
+        setIsLoading(false);
     }, []);
 
+    // 初期ロードとユーザー情報取得
+    useEffect(() => {
+        const init = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) { router.push('/auth'); return; }
+
+            // ユーザーの学習対象言語を取得
+            const { data: profile } = await supabase.from('profiles').select('learning_target').eq('id', session.user.id).single();
+            const currentSubject = profile?.learning_target || 'English';
+            setTargetSubject(currentSubject);
+
+            await fetchBooks(currentSubject); // データを取得
+        };
+        init();
+    }, [router, fetchBooks]);
+
+    // フィルタリングロジック
     useEffect(() => {
         let result = allBooks;
 
@@ -74,7 +95,7 @@ export default function TextbookList() {
             <div className="w-full max-w-5xl mb-8">
                 <div className="flex justify-between items-center mb-6">
                     <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3">
-                        <span className="text-4xl">📖</span> Grammar Library
+                        <span className="text-4xl">📖</span> {targetSubject} Library
                     </h1>
                     <Link href="/" className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-100 transition shadow-sm">
                         ← Home
@@ -87,7 +108,7 @@ export default function TextbookList() {
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="教科書を検索..."
+                        placeholder={`${targetSubject} の教科書を検索...`}
                         className="w-full pl-12 p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-blue-500 outline-none shadow-sm text-lg text-black transition"
                     />
                 </div>
@@ -96,9 +117,9 @@ export default function TextbookList() {
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide">
                     {[
                         { id: 'all', label: 'すべて', icon: '📚', color: 'bg-gray-600' },
-                        { id: 'eiken', label: '英検対策', icon: '💮', color: 'bg-red-500' },
                         { id: 'jhs', label: '中学英語', icon: '🏆', color: 'bg-yellow-500' },
                         { id: 'hs', label: '高校英語', icon: '🎓', color: 'bg-indigo-500' },
+                        { id: 'eiken', label: '英検対策', icon: '💮', color: 'bg-red-500' },
                         { id: 'business', label: 'ビジネス', icon: '💼', color: 'bg-blue-500' },
                         { id: 'grammar', label: '文法・教養', icon: '📝', color: 'bg-green-500' },
                     ].map((cat) => (
@@ -120,7 +141,7 @@ export default function TextbookList() {
             {isLoading ? (
                 <div className="text-center py-20">
                     <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
-                    <p className="text-gray-500">Loading library...</p>
+                    <p className="text-gray-500">Loading {targetSubject} library...</p>
                 </div>
             ) : (
                 <div className="w-full max-w-5xl grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -167,8 +188,8 @@ export default function TextbookList() {
                         })
                     ) : (
                         <div className="col-span-full text-center py-20 bg-white rounded-2xl border border-dashed border-gray-300 text-gray-500">
-                            <p className="text-xl mb-2">見つかりませんでした 💦</p>
-                            <p className="text-sm">カテゴリを変えてみてください。</p>
+                            <p className="text-xl mb-2">😭 {targetSubject} のコンテンツが見つかりません</p>
+                            <p className="text-sm">管理画面で新しい教科書を生成してください。</p>
                         </div>
                     )}
                 </div>
@@ -176,5 +197,4 @@ export default function TextbookList() {
         </main>
     );
 }
-
 

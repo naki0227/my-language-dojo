@@ -11,29 +11,31 @@ type RoadmapItem = {
     title: string;
     description: string;
     is_completed: boolean; // 視聴済みか？
+    subject: string; // 言語情報
 };
 
 type Props = {
-    levelResult: string; // "A1 (Beginner)" などの文字列
+    levelResult: string;
     userId: string;
+    currentSubject: string; // ★現在の言語
 };
 
-export default function LearningRoadmap({ levelResult, userId }: Props) {
+export default function LearningRoadmap({ levelResult, userId, currentSubject }: Props) {
     const [items, setItems] = useState<RoadmapItem[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // レベル文字列からコードだけ抽出 (例: "A1 (Beginner)" -> "A1")
     const levelCode = levelResult.split(' ')[0];
 
     useEffect(() => {
         const fetchRoadmap = async () => {
             setLoading(true);
 
-            // 1. ロードマップデータを取得
+            // 1. ロードマップデータを取得 (言語とレベルでフィルタリング)
             const { data: roadmapData } = await supabase
                 .from('roadmap_items')
                 .select('*')
                 .eq('level_code', levelCode)
+                .eq('subject', currentSubject) // ★フィルタリング
                 .order('step_order', { ascending: true });
 
             if (!roadmapData || roadmapData.length === 0) {
@@ -64,10 +66,10 @@ export default function LearningRoadmap({ levelResult, userId }: Props) {
         };
 
         fetchRoadmap();
-    }, [levelCode, userId]);
+    }, [levelCode, userId, currentSubject]); // ★依存配列にcurrentSubjectを追加
 
     if (loading) return <div className="p-4 text-center text-gray-400">Loading roadmap...</div>;
-    if (items.length === 0) return null; // データがない場合は表示しない
+    if (items.length === 0) return null;
 
     return (
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -75,12 +77,11 @@ export default function LearningRoadmap({ levelResult, userId }: Props) {
                 <span className="text-2xl">🗺️</span>
                 <div>
                     <h3 className="font-bold text-gray-800">Learning Roadmap</h3>
-                    <p className="text-xs text-gray-500 font-bold text-blue-600">Level: {levelCode}</p>
+                    <p className="text-xs text-gray-500 font-bold text-blue-600">Level: {levelCode} ({currentSubject})</p>
                 </div>
             </div>
 
             <div className="space-y-4 relative">
-                {/* 左側の線 */}
                 <div className="absolute left-[15px] top-4 bottom-4 w-0.5 bg-gray-200 -z-10"></div>
 
                 {items.map((item, index) => {
@@ -88,14 +89,12 @@ export default function LearningRoadmap({ levelResult, userId }: Props) {
 
                     return (
                         <div key={item.id} className={`relative flex gap-4 ${item.is_completed ? 'opacity-60' : 'opacity-100'}`}>
-                            {/* ステップ番号 / チェックマーク */}
                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold shrink-0 z-10 border-2 
                 ${item.is_completed ? 'bg-green-500 border-green-500' : isNext ? 'bg-blue-600 border-blue-600 animate-pulse' : 'bg-white border-gray-300 text-gray-400'}
               `}>
                                 {item.is_completed ? '✓' : item.step_order}
                             </div>
 
-                            {/* カード本体 */}
                             <div className={`flex-1 rounded-lg border p-3 transition 
                 ${isNext ? 'bg-blue-50 border-blue-200 shadow-md transform scale-105' : 'bg-white border-gray-200'}
               `}>
