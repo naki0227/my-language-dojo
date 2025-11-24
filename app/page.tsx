@@ -328,6 +328,7 @@ function HomeContent() {
       <div className="w-full flex gap-2 p-2 md:hidden overflow-x-auto bg-gray-50 border-b mb-2">
         <Link href="/search" className="bg-blue-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">🔍 検索</Link>
         <Link href="/vocab" className="bg-green-600 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📚 単語帳</Link>
+        <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1 rounded text-sm font-bold whitespace-nowrap">📖 教科書</Link>
         <button
           onClick={handleSaveToLibrary}
           disabled={isRegistering || subtitles.length === 0}
@@ -356,6 +357,7 @@ function HomeContent() {
         </button>
         <Link href="/search" className="bg-blue-500 text-white px-4 py-2 rounded font-bold hover:bg-blue-600">🔍 検索</Link>
         <Link href="/vocab" className="bg-green-600 text-white px-4 py-2 rounded font-bold hover:bg-green-700">📚 単語帳</Link>
+        <Link href="/textbook" className="bg-orange-500 text-white px-4 py-2 rounded font-bold hover:bg-orange-600">📖 教科書</Link>
       </div>
 
       {/* --- 辞書ポップアップ (レスポンシブ) --- */}
