@@ -1,4 +1,3 @@
-// components/CommentSection.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -20,10 +19,18 @@ export default function CommentSection({ videoId }: Props) {
     const [comments, setComments] = useState<Comment[]>([]);
     const [newComment, setNewComment] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [userId, setUserId] = useState<string | null>(null);
 
-    // 動画IDが変わったらコメントを読み込む
+    // 動画IDが変わったらコメントを読み込む & ログインユーザー確認
     useEffect(() => {
-        fetchComments();
+        const init = async () => {
+            // ログインユーザーIDを取得
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) setUserId(session.user.id);
+
+            fetchComments();
+        };
+        init();
     }, [videoId]);
 
     const fetchComments = async () => {
@@ -31,7 +38,7 @@ export default function CommentSection({ videoId }: Props) {
             .from('comments')
             .select('*')
             .eq('video_id', videoId)
-            .order('created_at', { ascending: false }); // 新しい順
+            .order('created_at', { ascending: false });
 
         if (data) setComments(data);
     };
@@ -39,27 +46,45 @@ export default function CommentSection({ videoId }: Props) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newComment.trim()) return;
+
+        if (!userId) {
+            alert('コメントするにはログインが必要です');
+            return;
+        }
+
         setIsSubmitting(true);
 
-        // プロフィールから名前を取得（なければ 'Anonymous'）
-        const { data: profile } = await supabase.from('profiles').select('username').single();
-        const username = profile?.username || 'Hero';
+        // プロフィールから名前を取得
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('username')
+            .eq('id', userId)
+            .single();
 
+        const username = profile?.username || '名無しさん';
+
+        // ★修正ポイント: user_id を含めて保存する
         const { error } = await supabase
             .from('comments')
-            .insert([{ video_id: videoId, username, content: newComment }]);
+            .insert([{
+                video_id: videoId,
+                user_id: userId, // ← これが必要でした！
+                username,
+                content: newComment
+            }]);
 
         if (!error) {
             setNewComment('');
             fetchComments(); // リスト更新
         } else {
-            alert('送信エラー');
+            console.error(error);
+            alert('送信エラー: ' + error.message);
         }
         setIsSubmitting(false);
     };
 
     const handleLike = async (id: number, currentLikes: number) => {
-        // 楽観的UI更新（サーバーを待たずに数字を増やす）
+        // 楽観的UI更新
         setComments(comments.map(c => c.id === id ? { ...c, likes: currentLikes + 1 } : c));
 
         await supabase
@@ -80,12 +105,13 @@ export default function CommentSection({ videoId }: Props) {
                     type="text"
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    placeholder="この動画の感想やメモを残そう..."
-                    className="flex-1 border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-black"
+                    placeholder={userId ? "感想やメモを残そう..." : "ログインしてコメントを書こう"}
+                    disabled={!userId}
+                    className="flex-1 border border-gray-300 rounded-lg p-3 text-sm focus:ring-2 focus:ring-blue-500 outline-none text-black disabled:bg-gray-100"
                 />
                 <button
                     type="submit"
-                    disabled={isSubmitting || !newComment}
+                    disabled={isSubmitting || !newComment || !userId}
                     className="bg-blue-600 text-white px-4 py-2 rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-300 transition"
                 >
                     送信
@@ -95,7 +121,7 @@ export default function CommentSection({ videoId }: Props) {
             {/* コメント一覧 */}
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
                 {comments.length === 0 ? (
-                    <p className="text-gray-400 text-center text-sm py-4">まだコメントはありません。一番乗りしよう！</p>
+                    <p className="text-gray-400 text-center text-sm py-4">まだコメントはありません。</p>
                 ) : (
                     comments.map((comment) => (
                         <div key={comment.id} className="border-b border-gray-100 pb-3 last:border-0 animate-fade-in">
