@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     try {
         const { message, userId } = await request.json();
 
-        // 1. ユーザー情報を収集
+        // 1. ユーザー情報を収集 (学習対象言語を取得)
         const { data: profile } = await adminSupabase
             .from('profiles')
             .select('*')
@@ -28,30 +28,40 @@ export async function POST(request: Request) {
             .limit(1)
             .single();
 
-        // 2. プロンプト作成 (JSON出力モード)
+        // ★修正ポイント: 学習対象言語をプロファイルから取得
+        const targetLanguage = profile?.learning_target || 'English';
+        const isLanguageLearning = targetLanguage !== 'Sign Language' && targetLanguage !== 'Programming';
+
+        // 2. プロンプト作成
         const systemPrompt = `
-      You are "Dojo Master", an AI English study advisor.
+      You are a friendly and encouraging AI study advisor named "Dojo Master".
+      Your expertise is wide, covering all languages and subjects.
       
       User Profile:
+      - Current Study Target: ${targetLanguage}
       - Level: ${testResult?.level_result || 'Unknown'}
       - Goal: ${profile?.goal || 'Not set'}
       
       User's Message: "${message}"
       
       Instructions:
-      1. Analyze the user's request.
-      2. If the user asks for video recommendations (e.g., "おすすめは？", "Recommend something"), YOU MUST generate a YouTube search query to find suitable videos.
-      3. Respond in Japanese.
+      1. Your primary focus is on the user's "Current Study Target".
+      2. If the user asks for recommendations ("おすすめは？"), YOU MUST generate a YouTube search query suitable for the target subject/language and level.
+         - Search must be specific (e.g., "Spanish conversation B1" or "Python tutorial for beginners").
+      3. Do NOT refuse assistance based on the subject (e.g., Do not say "I only know English").
+      4. Keep the response concise and encouraging.
+      5. Respond in Japanese.
       
       Output Format (JSON):
       {
         "reply": "Your friendly advice or introduction to the videos.",
-        "searchQuery": "English learning video for ${testResult?.level_result || 'beginners'} ${profile?.goal || ''}" (Optional: Only if recommending videos)
+        "searchQuery": "Search query here (e.g., Spanish beginner conversation)" (Optional: Only if recommending videos)
       }
     `;
 
         // 3. Gemini呼び出し
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
+        // responseMimeType: "application/json" は、aiResponse.searchQuery の型が確定するため必須
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro', generationConfig: { responseMimeType: "application/json" } });
 
         const result = await model.generateContent(systemPrompt);
@@ -59,13 +69,11 @@ export async function POST(request: Request) {
 
         let recommendedVideos: any[] = [];
 
-        // 4. もしAIが検索クエリを出したら、実際にYouTubeを検索する
-        if (aiResponse.searchQuery) {
+        // 4. YouTube検索
+        if (aiResponse.searchQuery && isLanguageLearning) {
             try {
                 const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
                 const search = await youtube.search(aiResponse.searchQuery);
-
-                // 上位3件を取得
                 recommendedVideos = search.videos.slice(0, 3).map((v: any) => ({
                     id: v.id,
                     title: v.title?.text || v.title?.toString() || 'No Title',
@@ -86,5 +94,4 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'AI is sleeping...' }, { status: 500 });
     }
 }
-
 
