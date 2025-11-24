@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase';
 type Props = {
     userId: string;
     onComplete: () => void;
+    onSkip: () => void; // 追加
 };
 
 const QUESTIONS = [
@@ -14,7 +15,7 @@ const QUESTIONS = [
     { q: "Have you ever ___ sushi?", options: ["eat", "ate", "eaten", "eating"], a: 2 },
 ];
 
-export default function PlacementTest({ userId, onComplete }: Props) {
+export default function PlacementTest({ userId, onComplete, onSkip }: Props) {
     const [step, setStep] = useState(0);
     const [score, setScore] = useState(0);
     const [finished, setFinished] = useState(false);
@@ -31,17 +32,24 @@ export default function PlacementTest({ userId, onComplete }: Props) {
 
     const finishTest = async () => {
         setFinished(true);
-        // 結果を保存
         await supabase.from('profiles').update({ placement_test_done: true }).eq('id', userId);
-        // スコアに応じてレベルやXPを初期設定しても良い
-        setTimeout(onComplete, 3000); // 3秒後に閉じる
+        setTimeout(onComplete, 3000);
     };
-
-    if (!userId) return null;
 
     return (
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-bounce-in">
+            <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-2xl animate-bounce-in text-black relative">
+
+                {/* スキップボタン */}
+                {!finished && (
+                    <button
+                        onClick={onSkip}
+                        className="absolute top-4 right-4 text-sm text-gray-400 hover:text-gray-600 underline"
+                    >
+                        スキップする
+                    </button>
+                )}
+
                 {!finished ? (
                     <>
                         <h2 className="text-2xl font-bold mb-2">🎓 実力診断テスト</h2>
@@ -70,3 +78,4 @@ export default function PlacementTest({ userId, onComplete }: Props) {
         </div>
     );
 }
+

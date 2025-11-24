@@ -13,15 +13,7 @@ import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import VideoSearchModal from '@/components/VideoSearchModal';
 
-// --- 型定義 ---
-// 複数の翻訳を持てるように変更
-type Subtitle = {
-  text: string;
-  translations: { [lang: string]: string }; // 例: { ja: "こんにちは", es: "Hola" }
-  offset: number;
-  duration: number;
-};
-
+type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
 type DictionaryData = {
   word: string; phonetic?: string; audio?: string; translation?: string;
   meanings: { partOfSpeech: string; definitions: { definition: string }[]; }[];
@@ -33,15 +25,9 @@ type UserProfile = {
   placement_test_done: boolean;
 };
 
-// サポートする言語リスト
 const SUPPORTED_LANGUAGES = [
-  { code: 'ja', label: '🇯🇵 日本語' },
-  { code: 'en', label: '🇺🇸 英語' },
-  { code: 'zh', label: '🇨🇳 中国語' },
-  { code: 'ko', label: '🇰🇷 韓国語' },
-  { code: 'pt', label: '🇧🇷 ポルトガル語' },
-  { code: 'ar', label: '🇸🇦 アラビア語' },
-  { code: 'ru', label: '🇷🇺 ロシア語' },
+  { code: 'ja', label: '🇯🇵 日本語' }, { code: 'en', label: '🇺🇸 英語' }, { code: 'zh', label: '🇨🇳 中国語' },
+  { code: 'ko', label: '🇰🇷 韓国語' }, { code: 'pt', label: '🇧🇷 ポルトガル語' }, { code: 'ar', label: '🇸🇦 アラビア語' }, { code: 'ru', label: '🇷🇺 ロシア語' },
 ];
 
 function HomeContent() {
@@ -49,31 +35,25 @@ function HomeContent() {
   const searchParams = useSearchParams();
   const initialVideoId = searchParams.get('videoId') || 'arj7oStGLkU';
 
-  // ユーザー情報
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState('Hero');
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true
-  });
+  const [userProfile, setUserProfile] = useState<UserProfile>({ id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true });
+
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
 
-  // 新機能
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  // 動画関連
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [player, setPlayer] = useState<YouTubePlayer | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
-  // ★多言語翻訳機能用State★
-  const [selectedLangs, setSelectedLangs] = useState<string[]>([]); // 選択中の言語コード配列
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false); // 言語メニューの開閉
+  const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
+  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
   const [isTranslating, setIsTranslating] = useState(false);
 
-  // 学習機能
   const [selectedWord, setSelectedWord] = useState<string | null>(null);
   const [dictData, setDictData] = useState<DictionaryData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -153,105 +133,52 @@ function HomeContent() {
   const loadVideo = async (idOverride?: string) => {
     const targetId = idOverride || videoId;
     if (idOverride) setVideoId(idOverride);
-    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
-    setSelectedLangs([]); // 動画が変わったら選択言語もリセット
-
+    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null); setSelectedLangs([]);
     try {
       const res = await fetch(`/api/transcript?videoId=${targetId}`);
       const data = await res.json();
       if (data.error) alert(`字幕エラー: ${data.error}`);
       else {
-        // APIから返ってくるデータは { text, offset... } なので translations プロパティを追加して整形
-        const formatted = data.map((item: any) => ({
-          ...item,
-          translations: {} // 初期化
-        }));
+        const formatted = data.map((item: any) => ({ ...item, translations: {} }));
         setSubtitles(formatted);
         logStudyActivity();
-        if (userId) {
-          await supabase.from('view_history').insert([{
-            user_id: userId,
-            content_type: 'video',
-            target_id: targetId,
-            title: "Video ${targetId}"
-          }]);
-        }
       }
     } catch (e) { alert('通信エラー'); }
   };
 
-  // ★翻訳データの取得とマージ★
   const fetchTranslations = async (langsToFetch: string[]) => {
     if (langsToFetch.length === 0) return;
     setIsTranslating(true);
-
     try {
-      // 現在の字幕データをコピー
       let updatedSubtitles = [...subtitles];
-
-      // 必要な言語ごとにAPIリクエストを並列実行
       const promises = langsToFetch.map(async (lang) => {
-        // すでにデータを持っていればスキップ (最初の行で判定)
-        if (updatedSubtitles.length > 0 && updatedSubtitles[0].translations[lang]) {
-          return null;
-        }
+        if (updatedSubtitles.length > 0 && updatedSubtitles[0].translations[lang]) return null;
         const res = await fetch(`/api/transcript?videoId=${videoId}&lang=${lang}`);
         const data = await res.json();
         return { lang, data };
       });
-
       const results = await Promise.all(promises);
-
-      // 取得した結果をマージ
       results.forEach(result => {
         if (!result || result.data.error) return;
-
-        // result.data は翻訳済みの字幕配列
         updatedSubtitles = updatedSubtitles.map((sub, index) => {
-          // 同じインデックスの翻訳データを探す
-          // (APIが整形済みデータを返すため、行数が変わる可能性があるが、今回は簡易的にインデックスでマッチ)
           const translationText = result.data[index]?.translation || "";
-          return {
-            ...sub,
-            translations: {
-              ...sub.translations,
-              [result.lang]: translationText
-            }
-          };
+          return { ...sub, translations: { ...sub.translations, [result.lang]: translationText } };
         });
       });
-
       setSubtitles(updatedSubtitles);
-
-    } catch (e) {
-      alert('翻訳データの取得に失敗しました');
-    } finally {
-      setIsTranslating(false);
-    }
+    } catch (e) { alert('翻訳エラー'); } finally { setIsTranslating(false); }
   };
 
-  // 言語の切り替えハンドラ
   const toggleLanguage = (langCode: string) => {
     let newLangs;
-    if (selectedLangs.includes(langCode)) {
-      // 削除
-      newLangs = selectedLangs.filter(l => l !== langCode);
-    } else {
-      // 追加（最大3つ）
-      if (selectedLangs.length >= 3) {
-        alert('同時に表示できるのは3言語までです');
-        return;
-      }
+    if (selectedLangs.includes(langCode)) newLangs = selectedLangs.filter(l => l !== langCode);
+    else {
+      if (selectedLangs.length >= 3) { alert('最大3言語まで'); return; }
       newLangs = [...selectedLangs, langCode];
     }
-
     setSelectedLangs(newLangs);
-
-    // 新しく追加された言語があればデータを取りに行く
     const addedLangs = newLangs.filter(l => !selectedLangs.includes(l));
-    if (addedLangs.length > 0) {
-      fetchTranslations(addedLangs);
-    }
+    if (addedLangs.length > 0) fetchTranslations(addedLangs);
   };
 
   const handleSaveToLibrary = async () => {
@@ -317,7 +244,15 @@ function HomeContent() {
 
   return (
     <main className={`h-screen flex flex-col bg-gray-50 transition-colors duration-500 ${getThemeStyles()} overflow-hidden`}>
-      {showPlacementTest && userId && <PlacementTest userId={userId} onComplete={() => setShowPlacementTest(false)} />}
+
+      {/* ★修正: プレイスメントテストにスキップ機能を追加★ */}
+      {showPlacementTest && userId && (
+        <PlacementTest
+          userId={userId}
+          onComplete={() => setShowPlacementTest(false)}
+          onSkip={() => setShowPlacementTest(false)} // スキップ時は単に閉じる
+        />
+      )}
 
       {/* ヘッダー */}
       <div className={`shrink-0 w-full flex flex-wrap justify-between items-center p-4 border-b ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
@@ -334,7 +269,15 @@ function HomeContent() {
           <div className="bg-white p-6 rounded-xl max-w-sm w-full text-black shadow-2xl">
             <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">⚙️ 設定</h3><button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button></div>
             <div className="space-y-4">
-              <Link href="/dashboard" className="block w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-center py-3 rounded-lg font-bold shadow-md hover:opacity-90 transition transform hover:scale-105">🏠 ダッシュボード(My Page)</Link>
+              <Link href="/dashboard" className="block w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-center py-3 rounded-lg font-bold shadow-md hover:opacity-90">
+                🏠 ダッシュボード
+              </Link>
+              {/* ▼▼▼ 追加: 過去の日替わり一覧へ ▼▼▼ */}
+              <Link href="/dashboard/archive" className="block w-full bg-gray-100 text-gray-700 text-center py-2 rounded-lg font-bold hover:bg-gray-200 text-sm">
+                📅 過去のピックアップ一覧
+              </Link>
+              {/* ▲▲▲ 追加 ▲▲▲ */}
+
               <div>
                 <p className="mb-1 font-bold text-sm text-gray-500">モード切替</p>
                 <div className="flex gap-2">
@@ -344,7 +287,6 @@ function HomeContent() {
                 </div>
               </div>
               <div><p className="mb-1 font-bold text-sm text-gray-500">目標</p><button onClick={handleGoalChange} className="w-full py-2 border rounded text-sm text-gray-700">🎯 {userProfile.goal || '設定'}</button></div>
-              <div><p className="mb-1 font-bold text-sm text-gray-500">名前</p><div className="flex gap-2"><input type="text" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1 border p-2 rounded text-black" /><button onClick={handleNameSave} className="bg-blue-600 text-white px-4 rounded font-bold text-sm">保存</button></div></div>
               <Link href="/inquiry" className="block w-full text-center text-blue-500 text-sm py-2 border rounded hover:bg-blue-50">📮 お問い合わせ</Link>
               <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 border rounded hover:bg-red-50">ログアウト</button>
             </div>
@@ -363,7 +305,6 @@ function HomeContent() {
 
       {/* === レイアウト本体 === */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
-        {/* スマホビュー */}
         <div className="md:hidden flex flex-col h-full w-full">
           <div className={`shrink-0 w-full bg-black transition-all duration-300 ${isAudioOnly ? 'h-12' : 'aspect-video'}`}>
             {isAudioOnly ? (
@@ -376,59 +317,31 @@ function HomeContent() {
 
           <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
             <div className={`rounded-lg shadow p-4 ${isPro ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
-
-              {/* AI翻訳ヘッダー */}
               <div className="flex justify-between items-center mb-2 relative">
                 <h2 className="text-sm opacity-50 font-bold">Transcript</h2>
                 <div className="flex items-center gap-2">
                   {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
-                  <button
-                    onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                    className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"
-                  >
+                  <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                     🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
                   </button>
                 </div>
-
-                {/* 言語選択ポップオーバー */}
                 {isLangMenuOpen && (
                   <div className="absolute right-0 top-8 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                    <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
                     <div className="space-y-1">
                       {SUPPORTED_LANGUAGES.map(lang => (
-                        <button
-                          key={lang.code}
-                          onClick={() => toggleLanguage(lang.code)}
-                          className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center
-                              ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}
-                            `}
-                        >
-                          <span>{lang.label}</span>
-                          {selectedLangs.includes(lang.code) && <span>✓</span>}
+                        <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
+                          <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
                         </button>
                       ))}
                     </div>
                   </div>
                 )}
               </div>
-
-              {/* 字幕リスト */}
               <div className="space-y-3">
                 {subtitles.length > 0 ? subtitles.map((sub, i) => (
                   <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
-                    <div className="mb-1">
-                      {(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}
-                    </div>
-
-                    {/* 選択された言語の翻訳を表示 */}
-                    {selectedLangs.map(lang => (
-                      sub.translations && sub.translations[lang] ? (
-                        <div key={lang} className="text-sm text-gray-500 mt-1 border-l-2 border-blue-200 pl-2">
-                          <span className="text-xs font-bold text-blue-400 mr-1">{lang.toUpperCase()}:</span>
-                          {sub.translations[lang]}
-                        </div>
-                      ) : null
-                    ))}
+                    <div className="mb-1">{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
+                    {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-sm text-gray-500 mt-1 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-1">{lang.toUpperCase()}:</span>{sub.translations[lang]}</div>) : null))}
                   </div>
                 )) : <p className="opacity-50 text-center">Loading...</p>}
               </div>
@@ -438,7 +351,7 @@ function HomeContent() {
           </div>
         </div>
 
-        {/* PCビュー (同じロジックを適用) */}
+        {/* PCビュー (ロジック重複のため省略せず記述) */}
         <div className="hidden md:flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
           <div className="flex-1 overflow-y-auto space-y-6 pr-2">
             {!isKids && userId && <Heatmap userId={userId} />}
@@ -457,27 +370,16 @@ function HomeContent() {
               <h2 className="text-sm font-bold opacity-50">Transcript</h2>
               <div className="flex items-center gap-2">
                 {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
-                <button
-                  onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                  className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1"
-                >
+                <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
                   🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
                 </button>
               </div>
               {isLangMenuOpen && (
                 <div className="absolute right-4 top-12 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                  <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
                   <div className="space-y-1">
                     {SUPPORTED_LANGUAGES.map(lang => (
-                      <button
-                        key={lang.code}
-                        onClick={() => toggleLanguage(lang.code)}
-                        className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center
-                              ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}
-                            `}
-                      >
-                        <span>{lang.label}</span>
-                        {selectedLangs.includes(lang.code) && <span>✓</span>}
+                      <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
+                        <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
                       </button>
                     ))}
                   </div>
@@ -488,16 +390,7 @@ function HomeContent() {
               {subtitles.map((sub, i) => (
                 <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-lg leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
                   <div>{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
-
-                  {/* PC版も同様に複数翻訳表示 */}
-                  {selectedLangs.map(lang => (
-                    sub.translations && sub.translations[lang] ? (
-                      <div key={lang} className="text-base text-gray-500 mt-2 border-l-2 border-blue-200 pl-2">
-                        <span className="text-xs font-bold text-blue-400 mr-2">{lang.toUpperCase()}</span>
-                        {sub.translations[lang]}
-                      </div>
-                    ) : null
-                  ))}
+                  {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-base text-gray-500 mt-2 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-2">{lang.toUpperCase()}</span>{sub.translations[lang]}</div>) : null))}
                 </div>
               ))}
             </div>
@@ -505,7 +398,6 @@ function HomeContent() {
         </div>
       </div>
 
-      {/* 辞書ポップアップ */}
       {selectedWord && (
         <>
           <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setSelectedWord(null)} />
