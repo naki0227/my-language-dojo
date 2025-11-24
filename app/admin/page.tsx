@@ -23,6 +23,9 @@ export default function AdminPage() {
     const [selectedWordbook, setSelectedWordbook] = useState<string>('');
     const [wordbooks, setWordbooks] = useState<Wordbook[]>([]);
 
+    // ★追加: 生成されたクイズデータを一時保存するState
+    const [dailyQuiz, setDailyQuiz] = useState<any>(null);
+
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -99,7 +102,7 @@ export default function AdminPage() {
         finally { setIsGenerating(false); }
     };
 
-    // ★日替わりAI自動生成★
+    // ★日替わりAI自動生成 (修正版)★
     const handleAiDailyPick = async () => {
         setIsGenerating(true);
         try {
@@ -109,7 +112,9 @@ export default function AdminPage() {
 
             setTopic(data.videoId); // 動画ID
             setContent(data.message); // メッセージ
-            alert(`AIが選定しました！\nテーマ: ${data.topic}`);
+            setDailyQuiz(data.quiz); // ★クイズデータも保存
+
+            alert(`AI選定完了！\nテーマ: ${data.topic}\nクイズ: ${data.quiz ? data.quiz.length : 0}問生成`);
         } catch (e) {
             alert('AI選定に失敗しました');
         } finally {
@@ -117,6 +122,20 @@ export default function AdminPage() {
         }
     };
 
+    // 日替わり保存
+    const handleSaveDaily = async () => {
+        const { error } = await supabase.from('daily_picks').upsert([{
+            date: new Date().toISOString().split('T')[0],
+            video_id: topic,
+            message: content,
+            quiz_data: dailyQuiz // ★クイズデータもDBに保存
+        }], { onConflict: 'date' });
+
+        if (!error) alert('本日のコンテンツを設定しました！');
+        else alert('エラー: ' + error.message);
+    };
+
+    // 教科書保存
     const handleSave = async () => {
         if (!title || !content) return;
         setIsSaving(true);
@@ -152,8 +171,8 @@ export default function AdminPage() {
                 </div>
 
                 <div className="flex gap-4 mb-8 border-b border-gray-700 pb-1">
-                    <button onClick={() => setActiveTab('textbook')} className={`pb-2 px-4 font-bold transition ${activeTab === 'textbook' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>📖 教科書</button>
-                    <button onClick={() => setActiveTab('comments')} className={`pb-2 px-4 font-bold transition ${activeTab === 'comments' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500 hover:text-gray-300'}`}>💬 コメント</button>
+                    <button onClick={() => setActiveTab('textbook')} className={`pb-2 px-4 font-bold transition ${activeTab === 'textbook' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500 hover:text-gray-300'}`}>📖 教科書ジェネレーター</button>
+                    <button onClick={() => setActiveTab('comments')} className={`pb-2 px-4 font-bold transition ${activeTab === 'comments' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500 hover:text-gray-300'}`}>💬 コメント管理</button>
                     <button onClick={() => setActiveTab('daily')} className={`pb-2 px-4 font-bold transition ${activeTab === 'daily' ? 'text-yellow-400 border-b-2 border-yellow-400' : 'text-gray-500 hover:text-gray-300'}`}>📅 日替わり設定</button>
                 </div>
 
@@ -212,57 +231,34 @@ export default function AdminPage() {
                     </div>
                 )}
 
-                {/* --- 日替わり設定画面 --- */}
                 {activeTab === 'daily' && (
                     <div className="bg-gray-800 p-6 rounded-xl border border-gray-700 animate-fade-in">
                         <h2 className="font-bold text-xl mb-4 text-yellow-400">📅 Today's Pick Configuration</h2>
                         <div className="space-y-4">
-                            <button
-                                onClick={handleAiDailyPick}
-                                disabled={isGenerating}
-                                className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mb-4 flex items-center justify-center gap-2
-                  ${isGenerating ? 'bg-gray-600 cursor-not-allowed' : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:opacity-90'}`}
-                            >
-                                {isGenerating ? 'AI is thinking...' : '🤖 AI Auto-Select (Today\'s Theme)'}
+                            <button onClick={handleAiDailyPick} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mb-4 flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-600' : 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:opacity-90'}`}>
+                                {isGenerating ? 'AI is thinking...' : '🤖 AI Auto-Select & Quiz Gen'}
                             </button>
 
                             <div>
                                 <label className="block text-sm text-gray-400 mb-1">Today's Video ID</label>
-                                <div className="flex gap-2">
-                                    <input
-                                        type="text"
-                                        value={topic} // 動画IDとして使用
-                                        onChange={(e) => setTopic(e.target.value)}
-                                        placeholder="YouTube ID"
-                                        className="flex-1 p-3 rounded bg-gray-900 border border-gray-600"
-                                    />
-                                    <button onClick={() => setIsSearchOpen(true)} className="bg-blue-600 px-4 rounded font-bold">検索</button>
-                                </div>
+                                <input type="text" value={topic} onChange={(e) => setTopic(e.target.value)} placeholder="YouTube ID" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
                             </div>
                             <div>
                                 <label className="block text-sm text-gray-400 mb-1">Message</label>
-                                <input
-                                    type="text"
-                                    value={content} // メッセージとして使用
-                                    onChange={(e) => setContent(e.target.value)}
-                                    placeholder="今日のひとこと"
-                                    className="w-full p-3 rounded bg-gray-900 border border-gray-600"
-                                />
+                                <input type="text" value={content} onChange={(e) => setContent(e.target.value)} placeholder="今日のひとこと" className="w-full p-3 rounded bg-gray-900 border border-gray-600" />
                             </div>
-                            <button
-                                onClick={async () => {
-                                    const { error } = await supabase.from('daily_picks').upsert([{
-                                        date: new Date().toISOString().split('T')[0],
-                                        video_id: topic,
-                                        message: content
-                                    }], { onConflict: 'date' });
-                                    if (!error) alert('設定しました！');
-                                    else alert('エラー: ' + error.message);
-                                }}
-                                className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold"
-                            >
-                                Set as Today's Pick
-                            </button>
+
+                            {/* クイズプレビュー */}
+                            {dailyQuiz && (
+                                <div className="bg-gray-700 p-3 rounded text-sm text-gray-300">
+                                    <p className="font-bold text-green-400 mb-1">✅ Generated Quiz ({dailyQuiz.length} questions)</p>
+                                    <ul className="list-disc pl-4">
+                                        {dailyQuiz.map((q: any, i: number) => <li key={i}>{q.q}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+
+                            <button onClick={handleSaveDaily} className="w-full bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold">Set as Today's Pick</button>
                         </div>
                     </div>
                 )}
