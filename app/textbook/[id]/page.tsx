@@ -27,7 +27,18 @@ export default function TextbookViewer() {
                 .select('*')
                 .eq('id', id)
                 .single();
-            if (data) setBook(data);
+            if (data) {
+                setBook(data);
+                const { data: { session } } = await supabase.auth.getSession();
+                if (session) {
+                    await supabase.from('view_history').insert([{
+                        use_id: session.user.id,
+                        content_type: 'textbook',
+                        target_id: id as string,
+                        title: data.title
+                    }]);
+                }
+            }
         };
         if (id) fetchBook();
     }, [id]);

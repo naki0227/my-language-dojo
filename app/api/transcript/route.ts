@@ -1,53 +1,55 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { supabase } from '@/lib/supabase'; // サーバー側でもsupabaseクライアントが必要
+import { createClient } from '@supabase/supabase-js';
 // @ts-ignore
 import { Innertube, UniversalCache } from 'youtubei.js';
 
-// ※注意: 本番環境でsupabaseを使うために、このファイル内でcreateClientする必要がありますが、
-// 今回は簡易的にAPIルート内で直接RESTで叩くか、既存のクライアントをimportして使います。
-// もし '@/lib/supabase' が 'use client' 前提で作られている場合は、
-// ここで createClient をし直す必要があります。
-import { createClient } from '@supabase/supabase-js';
-
 const adminSupabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY! // 本来はSERVICE_ROLE_KEY推奨ですがANONでもRLS無効ならOK
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // AI処理時間を確保
+export const maxDuration = 60;
+
+// ★修正: 言語コードを正式な英語名に変換するマップ
+const LANG_MAP: Record<string, string> = {
+    ja: 'Japanese',
+    en: 'English',
+    zh: 'Chinese (Simplified)',
+    ko: 'Korean',
+    pt: 'Portuguese',
+    ar: 'Arabic',
+    ru: 'Russian',
+};
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get('videoId');
-    const targetLang = searchParams.get('lang') || 'ja'; // デフォルト日本語
-    const forceAi = searchParams.get('force') === 'true'; // 強制AI生成フラグ
+    const code = searchParams.get('lang') || 'ja';
+
+    // ここでコード(zh)を名前(Chinese)に変換。なければそのまま渡す。
+    const targetLangName = LANG_MAP[code] || 'Japanese';
 
     if (!videoId) return NextResponse.json({ error: 'Video ID required' }, { status: 400 });
 
     try {
-        // 1. まずキャッシュ(DB)にあるか探す
-        if (!forceAi) {
-            const { data: cached } = await adminSupabase
-                .from('cached_subtitles')
-                .select('content')
-                .match({ video_id: videoId, language: targetLang })
-                .single();
+        // 1. キャッシュ確認 (言語コードで検索)
+        const { data: cached } = await adminSupabase
+            .from('cached_subtitles')
+            .select('content')
+            .match({ video_id: videoId, language: code })
+            .single();
 
-            if (cached) {
-                console.log(`[API] Returning cached subtitle for ${videoId} (${targetLang})`);
-                return NextResponse.json(cached.content);
-            }
+        if (cached) {
+            return NextResponse.json(cached.content);
         }
 
-        // 2. キャッシュがない場合、YouTubeから生の字幕を取得
-        console.log(`[API] Fetching raw transcript...`);
+        // 2. YouTubeから取得
         const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
         const info = await youtube.getInfo(videoId);
         const transcriptData = await info.getTranscript();
 
-        // 生データを整形
         // @ts-ignore
         const rawLines = transcriptData.transcript.content.body.initial_segments.map((segment: any) => ({
             text: segment.snippet.text,
@@ -55,24 +57,20 @@ export async function GET(request: Request) {
             duration: parseInt(segment.end_ms) - parseInt(segment.start_ms)
         }));
 
-        // 字幕が長すぎる場合はAI処理を諦めて生データを返す（コスト削減・エラー回避）
-        if (rawLines.length > 500) {
-            console.log('[API] Transcript too long for AI, returning raw.');
-            return NextResponse.json(rawLines);
-        }
+        if (rawLines.length > 500) return NextResponse.json(rawLines);
 
-        // 3. Geminiに「整形と翻訳」を依頼
-        console.log(`[API] Requesting AI fix & translate...`);
+        // 3. AI翻訳
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
 
+        // ★修正: プロンプトから (Japanese) を削除し、動的な言語名を渡す
         const prompt = `
-      You are a professional subtitle editor.
-      I will provide a raw YouTube transcript JSON. It has fragmented sentences.
+      You are a professional subtitle editor and translator.
+      I will provide a raw YouTube transcript JSON.
       
       Please do the following:
       1. Combine fragmented words into proper, natural sentences.
-      2. Translate each sentence into "${targetLang}" (Japanese).
+      2. Translate each sentence into "${targetLangName}".
       3. Keep the approximate "offset" (start time) of the first word in the sentence.
       4. Return a JSON array.
 
@@ -81,7 +79,7 @@ export async function GET(request: Request) {
 
       Output Format (JSON only):
       [
-        { "text": "Original English sentence.", "translation": "翻訳された日本語。", "offset": 1234, "duration": 5000 }
+        { "text": "Original English sentence.", "translation": "Translated sentence in ${targetLangName}", "offset": 1234, "duration": 5000 }
       ]
     `;
 
@@ -89,14 +87,13 @@ export async function GET(request: Request) {
         const responseText = result.response.text().replace(/```json|```/g, '').trim();
         const aiData = JSON.parse(responseText);
 
-        // 4. 結果をDBに保存 (キャッシュ)
+        // 4. 保存
         await adminSupabase.from('cached_subtitles').insert({
             video_id: videoId,
-            language: targetLang,
+            language: code,
             content: aiData
         });
 
-        console.log(`[API] Saved new cache.`);
         return NextResponse.json(aiData);
 
     } catch (error) {
@@ -104,4 +101,5 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: 'Failed to process transcript' }, { status: 500 });
     }
 }
+
 
