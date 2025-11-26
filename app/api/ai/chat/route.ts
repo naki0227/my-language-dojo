@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
-// @ts-ignore
-import { Innertube, UniversalCache } from 'youtubei.js';
 
 const adminSupabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,85 +11,87 @@ export async function POST(request: Request) {
     try {
         const { message, userId } = await request.json();
 
-        // 1. ユーザー情報を収集 (学習対象言語を取得)
-        const { data: profile } = await adminSupabase
-            .from('profiles')
-            .select('*')
-            .eq('id', userId)
-            .single();
+        const { data: profile } = await adminSupabase.from('profiles').select('*').eq('id', userId).single();
+        const { data: testResult } = await adminSupabase.from('test_results').select('score, level_result').eq('user_id', userId).order('taken_at', { ascending: false }).limit(1).single();
 
-        const { data: testResult } = await adminSupabase
-            .from('test_results')
-            .select('score, level_result')
-            .eq('user_id', userId)
-            .order('taken_at', { ascending: false })
-            .limit(1)
-            .single();
-
-        // ★修正ポイント: 学習対象言語をプロファイルから取得
         const targetLanguage = profile?.learning_target || 'English';
-        const isLanguageLearning = targetLanguage !== 'Sign Language' && targetLanguage !== 'Programming';
 
-        // 2. プロンプト作成
+        // Gemini 3.0 Pro (or Flash)
+        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
+
         const systemPrompt = `
-      You are a friendly and encouraging AI study advisor named "Dojo Master".
-      Your expertise is wide, covering all languages and subjects.
+      You are "Dojo Master", an AI study advisor for ${targetLanguage}.
       
       User Profile:
-      - Current Study Target: ${targetLanguage}
+      - Target: ${targetLanguage}
       - Level: ${testResult?.level_result || 'Unknown'}
-      - Goal: ${profile?.goal || 'Not set'}
       
       User's Message: "${message}"
       
       Instructions:
-      1. Your primary focus is on the user's "Current Study Target".
-      2. If the user asks for recommendations ("おすすめは？"), YOU MUST generate a YouTube search query suitable for the target subject/language and level.
-         - Search must be specific (e.g., "Spanish conversation B1" or "Python tutorial for beginners").
-      3. Do NOT refuse assistance based on the subject (e.g., Do not say "I only know English").
-      4. Keep the response concise and encouraging.
-      5. Respond in Japanese.
+      1. Give advice about learning ${targetLanguage}.
+      2. If the user asks for recommendations, generate a simple keyword to search the INTERNAL DATABASE.
+         - Keyword should be in English or the target language.
+         - Example: "Business", "Greeting", "Grammar"
+      3. Respond in Japanese.
       
       Output Format (JSON):
       {
-        "reply": "Your friendly advice or introduction to the videos.",
-        "searchQuery": "Search query here (e.g., Spanish beginner conversation)" (Optional: Only if recommending videos)
+        "reply": "Advice here.",
+        "searchKeyword": "Keyword" (Optional)
       }
     `;
-
-        // 3. Gemini呼び出し
-        const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        // responseMimeType: "application/json" は、aiResponse.searchQuery の型が確定するため必須
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro', generationConfig: { responseMimeType: "application/json" } });
 
         const result = await model.generateContent(systemPrompt);
         const aiResponse = JSON.parse(result.response.text());
 
         let recommendedVideos: any[] = [];
 
-        // 4. YouTube検索
-        if (aiResponse.searchQuery && isLanguageLearning) {
+        // ★修正: YouTubeではなく、自分のDB (library_videos) から検索
+        if (aiResponse.searchKeyword) {
             try {
-                const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
-                const search = await youtube.search(aiResponse.searchQuery);
-                recommendedVideos = search.videos.slice(0, 3).map((v: any) => ({
-                    id: v.id,
-                    title: v.title?.text || v.title?.toString() || 'No Title',
-                    thumbnail: v.thumbnails?.[0]?.url || ''
-                }));
-            } catch (ytError) {
-                console.error('YouTube Search Error:', ytError);
+                // 1. ライブラリから検索
+                const { data: videos } = await adminSupabase
+                    .from('library_videos')
+                    .select('video_id, title, thumbnail_url')
+                    .ilike('title', `%${aiResponse.searchKeyword}%`)
+                    .limit(3);
+
+                if (videos && videos.length > 0) {
+                    recommendedVideos = videos.map(v => ({
+                        id: v.video_id,
+                        title: v.title,
+                        thumbnail: v.thumbnail_url
+                    }));
+                } else {
+                    // ヒットしなければ、その言語の動画をランダムに提案 (フォールバック)
+                    // ※ subjectカラムがない古いデータも考慮して検索条件は緩めに
+                    const { data: randomVideos } = await adminSupabase
+                        .from('library_videos')
+                        .select('video_id, title, thumbnail_url')
+                        .limit(3);
+
+                    if (randomVideos) {
+                        recommendedVideos = randomVideos.map(v => ({
+                            id: v.video_id,
+                            title: v.title,
+                            thumbnail: v.thumbnail_url
+                        }));
+                        aiResponse.reply += "\n(検索条件に合う動画が見つからなかったので、人気の動画を表示します)";
+                    }
+                }
+            } catch (dbError) {
+                console.error('DB Search Error:', dbError);
             }
         }
 
-        return NextResponse.json({
-            reply: aiResponse.reply,
-            videos: recommendedVideos
-        });
+        return NextResponse.json({ reply: aiResponse.reply, videos: recommendedVideos });
 
     } catch (error) {
         console.error('Chat Error:', error);
         return NextResponse.json({ error: 'AI is sleeping...' }, { status: 500 });
     }
 }
+
 

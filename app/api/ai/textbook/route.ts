@@ -13,7 +13,7 @@ export async function POST(request: Request) {
         console.log(`[API] Generating textbook for: ${category} / ${topic || 'AUTO'}`);
 
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         // 1. トピック自動決定
         if (!topic) {

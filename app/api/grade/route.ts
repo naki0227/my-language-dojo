@@ -19,7 +19,7 @@ export async function POST(request: Request) {
 
         // Geminiクライアントの準備
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         // プロンプト（命令文）の作成
         const prompt = `

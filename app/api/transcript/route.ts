@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
+import { YoutubeTranscript } from 'youtube-transcript';
 // @ts-ignore
 import { Innertube, UniversalCache } from 'youtubei.js';
 
@@ -12,94 +13,160 @@ const adminSupabase = createClient(
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-// ★修正: 言語コードを正式な英語名に変換するマップ
 const LANG_MAP: Record<string, string> = {
-    ja: 'Japanese',
-    en: 'English',
-    zh: 'Chinese (Simplified)',
-    ko: 'Korean',
-    pt: 'Portuguese',
-    ar: 'Arabic',
-    ru: 'Russian',
+    ja: 'Japanese', en: 'English', zh: 'Chinese (Simplified)', ko: 'Korean',
+    pt: 'Portuguese', ar: 'Arabic', ru: 'Russian', es: 'Spanish', fr: 'French',
 };
+
+// デモ動画用バックアップ (通信エラー時の保険)
+const FALLBACK_TRANSCRIPTS: Record<string, any[]> = {
+    'arj7oStGLkU': [
+        { text: "So in college, I was a government major, which means I had to write a lot of papers.", offset: 1000, duration: 6000 },
+        { text: "Now, when a normal student writes a paper, they might spread the work out a little like this.", offset: 7000, duration: 7000 },
+        { text: "So, you know -- you get started a little bit.", offset: 14000, duration: 2000 },
+        { text: "You do a little bit more the next day.", offset: 17000, duration: 2000 },
+        { text: "And I had a plan like this.", offset: 20000, duration: 4000 },
+        { text: "I was ready to go.", offset: 22000, duration: 2000 },
+        { text: "But then, actually, the paper would come along,", offset: 24000, duration: 3000 },
+        { text: "and then I would kind of do this.", offset: 27000, duration: 3000 },
+        { text: "And that would happen every single paper.", offset: 30000, duration: 3000 },
+    ],
+    'UF8uR6Z6KLc': [
+        { text: "I am honored to be with you today at your commencement from one of the finest universities in the world.", offset: 1000, duration: 8000 },
+        { text: "I never graduated from college. Truth be told, this is the closest I've ever gotten to a college graduation.", offset: 10000, duration: 9000 },
+    ]
+};
+
+const mergeData = (englishData: any[], translations: string[]) => {
+    return englishData.map((item, index) => ({
+        ...item,
+        translation: translations[index] || ""
+    }));
+};
+
+function chunkArray<T>(array: T[], size: number): T[][] {
+    const chunked = [];
+    for (let i = 0; i < array.length; i += size) {
+        chunked.push(array.slice(i, i + size));
+    }
+    return chunked;
+}
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const videoId = searchParams.get('videoId');
-    const code = searchParams.get('lang') || 'ja';
-
-    // ここでコード(zh)を名前(Chinese)に変換。なければそのまま渡す。
-    const targetLangName = LANG_MAP[code] || 'Japanese';
+    const code = searchParams.get('lang') || 'en';
+    const targetLangName = LANG_MAP[code] || 'English';
 
     if (!videoId) return NextResponse.json({ error: 'Video ID required' }, { status: 400 });
 
-    try {
-        // 1. キャッシュ確認 (言語コードで検索)
-        const { data: cached } = await adminSupabase
-            .from('cached_subtitles')
-            .select('content')
-            .match({ video_id: videoId, language: code })
-            .single();
+    // デモ動画特例
+    if (FALLBACK_TRANSCRIPTS[videoId]) {
+        console.log(`[API] Demo video detected (${videoId}). Returning static data.`);
+        const staticData = FALLBACK_TRANSCRIPTS[videoId].map(l => ({ ...l, translation: "" }));
+        return NextResponse.json(staticData);
+    }
 
-        if (cached) {
-            return NextResponse.json(cached.content);
+    try {
+        // 1. キャッシュ確認
+        if (code !== 'en') {
+            const { data: translationData } = await adminSupabase.from('localized_translations').select('translations').match({ video_id: videoId, language: code }).single();
+            if (translationData) {
+                const { data: masterData } = await adminSupabase.from('optimized_transcripts').select('content').eq('video_id', videoId).single();
+                if (masterData) return NextResponse.json(mergeData(masterData.content, translationData.translations));
+            }
+        } else {
+            const { data: masterDataEn } = await adminSupabase.from('optimized_transcripts').select('content').eq('video_id', videoId).single();
+            if (masterDataEn) return NextResponse.json(masterDataEn.content.map((l: any) => ({ ...l, translation: "" }))
+            );
         }
 
-        // 2. YouTubeから取得
-        const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
-        const info = await youtube.getInfo(videoId);
-        const transcriptData = await info.getTranscript();
+        // 2. 字幕取得 (YouTubeへアクセス)
+        let rawLines: any[] = [];
 
-        // @ts-ignore
-        const rawLines = transcriptData.transcript.content.body.initial_segments.map((segment: any) => ({
-            text: segment.snippet.text,
-            offset: parseInt(segment.start_ms),
-            duration: parseInt(segment.end_ms) - parseInt(segment.start_ms)
-        }));
+        try {
+            // Plan A: youtube-transcript
+            const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+            // @ts-ignore
+            rawLines = transcript.map((t: any) => ({ text: t.text, offset: Math.floor(t.offset), duration: Math.floor(t.duration) }));
+        } catch (errA) {
+            try {
+                // Plan B: youtubei.js
+                const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
+                const info = await youtube.getInfo(videoId);
+                const transcriptData = await info.getTranscript();
+                if (transcriptData?.transcript?.content?.body?.initial_segments) {
+                    // @ts-ignore
+                    rawLines = transcriptData.transcript.content.body.initial_segments.map((segment: any) => ({
+                        text: segment.snippet.text,
+                        offset: parseInt(segment.start_ms),
+                        duration: parseInt(segment.end_ms) - parseInt(segment.start_ms)
+                    }));
+                }
+            } catch (errB) {
+                console.error('[API] All fetch plans failed.', errB);
+                // 取得失敗時は、AI処理をスキップしてダミーを出すパスへ
+            }
+        }
 
-        if (rawLines.length > 500) return NextResponse.json(rawLines);
+        // 4. AI整形・翻訳
+        if (rawLines.length === 0) {
+            console.warn('[API] Returning NO CAPTIONS message.');
+            return NextResponse.json([
+                { text: "⚠️ 字幕データが見つかりませんでした。", offset: 0, duration: 4000, translation: "" },
+            ], { status: 200 });
+        }
 
-        // 3. AI翻訳
+        // AI整形・翻訳の実行
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
 
-        // ★修正: プロンプトから (Japanese) を削除し、動的な言語名を渡す
-        const prompt = `
-      You are a professional subtitle editor and translator.
-      I will provide a raw YouTube transcript JSON.
-      
-      Please do the following:
-      1. Combine fragmented words into proper, natural sentences.
-      2. Translate each sentence into "${targetLangName}".
-      3. Keep the approximate "offset" (start time) of the first word in the sentence.
-      4. Return a JSON array.
+        // 長すぎる場合はAIスキップ
+        if (rawLines.length > 2000 && code === 'en') {
+            const safeData = rawLines.map(l => ({ ...l, translation: "" }));
+            await adminSupabase.from('optimized_transcripts').upsert({ video_id: videoId, content: safeData });
+            return NextResponse.json(safeData);
+        }
 
-      Raw Input:
-      ${JSON.stringify(rawLines)}
+        const chunks = chunkArray(rawLines, 50);
+        let finalFormatted: any[] = [];
+        let finalTranslation: any[] = [];
 
-      Output Format (JSON only):
-      [
-        { "text": "Original English sentence.", "translation": "Translated sentence in ${targetLangName}", "offset": 1234, "duration": 5000 }
-      ]
-    `;
+        try {
+            for (const chunk of chunks) {
+                const prompt = `
+              You are a professional subtitle editor.
+              1. **Combine fragmented words into natural, complete sentences.** (Most Important)
+              2. ${code === 'en' ? 'Do not translate, just return the corrected English sentences in the "text" field.' : `Translate the corrected sentences into "${targetLangName}" and put it in the "translation" field.`}
+              3. Maintain the approximate timestamp.
+              
+              Raw Input: ${JSON.stringify(chunk)}
+              Output Format (JSON Array): [ { "text": "Corrected English", "translation": "${code === 'en' ? '' : 'Translated'}", "offset": 123, "duration": 456 } ]
+            `;
+                const result = await model.generateContent(prompt);
+                const chunkData = JSON.parse(result.response.text());
 
-        const result = await model.generateContent(prompt);
-        const responseText = result.response.text().replace(/```json|```/g, '').trim();
-        const aiData = JSON.parse(responseText);
+                chunkData.forEach((item: any) => {
+                    finalFormatted.push({ text: item.text, offset: item.offset, duration: item.duration });
+                    finalTranslation.push(item.translation);
+                });
+            }
 
-        // 4. 保存
-        await adminSupabase.from('cached_subtitles').insert({
-            video_id: videoId,
-            language: code,
-            content: aiData
-        });
+            // 5. 保存
+            await adminSupabase.from('optimized_transcripts').upsert({ video_id: videoId, content: finalFormatted });
+            if (code !== 'en') {
+                await adminSupabase.from('localized_translations').upsert({ video_id: videoId, language: code, translations: finalTranslation }, { onConflict: 'video_id, language' });
+            }
 
-        return NextResponse.json(aiData);
+            return NextResponse.json(finalFormatted.map((item, index) => ({ ...item, translation: finalTranslation[index] || "" })));
+
+        } catch (aiError) {
+            console.warn('[API] AI processing failed, returning raw data:', aiError);
+            return NextResponse.json(rawLines.map(l => ({ ...l, translation: "" })));
+        }
 
     } catch (error) {
-        console.error('[API] Error:', error);
-        return NextResponse.json({ error: 'Failed to process transcript' }, { status: 500 });
+        console.error('[API] Fatal Error:', error);
+        return NextResponse.json([], { status: 500 });
     }
 }
-
-

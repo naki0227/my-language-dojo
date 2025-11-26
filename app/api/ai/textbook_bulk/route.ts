@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
         // Gemini APIクライアントの初期化
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-pro' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         // 生成するトピックを取得
         const textbookTopics = SUBJECT_TOPICS[subject] || SUBJECT_TOPICS['English'];

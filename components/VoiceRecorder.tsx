@@ -80,7 +80,7 @@ export default function VoiceRecorder({ targetText }: Props) {
         <div className="flex flex-col gap-4 p-6 bg-white rounded-xl shadow-md border border-blue-100 w-full transition-all">
             <div className="flex justify-between items-center border-b pb-2">
                 <h3 className="text-lg font-bold text-gray-700">🎤 AIシャドーイング</h3>
-                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Gemini 2.5 Pro</span>
+                <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">Gemini 2.5 Flash</span>
             </div>
 
             {/* 練習中の文章表示 */}
