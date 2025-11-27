@@ -10,6 +10,11 @@ export const metadata: Metadata = {
     default: "Vidnitive - 動画とAIで学ぶ多言語学習プラットフォーム",
     template: "%s | Vidnitive",
   },
+
+  verification: {
+    google: "KyU3omeJa0rFCNq2A - 5r7Y8Pi0db2020YYo3Q- BIH5M"
+  },
+
   description: "YouTube動画からAIが自動で字幕・単語帳・教科書を生成。英語、スペイン語、中国語など10ヶ国語以上に対応した、次世代の語学学習プラットフォーム。",
   keywords: ["英語学習", "多言語", "AI", "YouTube", "語学", "プログラミング学習", "Vidnitive", "ヴィドニティブ"],
   authors: [{ name: "Information Student" }],
@@ -27,6 +32,7 @@ export const metadata: Metadata = {
     title: "Vidnitive - AI Video Learning",
     description: "動画 × AI × 多言語。最強の学習ツール。",
   },
+
 };
 
 export default function RootLayout({
