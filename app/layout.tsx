@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   },
 
   verification: {
-    google: "KyU3omeJa0rFCNq2A - 5r7Y8Pi0db2020YYo3Q- BIH5M"
+    google: "KyU3omeJa0rFCNq2A-5r7Y8Pi0db2020YYo3Q-BIH5M"
   },
 
   description: "YouTube動画からAIが自動で字幕・単語帳・教科書を生成。英語、スペイン語、中国語など10ヶ国語以上に対応した、次世代の語学学習プラットフォーム。",
