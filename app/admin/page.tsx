@@ -5,10 +5,10 @@ import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import VideoSearchModal from '@/components/VideoSearchModal';
 import { useRouter } from 'next/navigation';
-import { CheckCircle, RotateCw, BookOpen, Map, Calendar, MessageSquare, Mail, Rocket, Database, Search, PlayCircle, Save, Factory, Book, StopCircle, Clipboard, FileText } from 'lucide-react';
+import { CheckCircle, RotateCw, BookOpen, Map, Calendar, MessageSquare, Mail, Rocket, Database, Search, PlayCircle, Save, Factory, Book, StopCircle, Clipboard, FileText, Users } from 'lucide-react'; // Usersアイコン追加
 import { SETUP_SUBJECTS } from '@/lib/constants';
 
-// カテゴリ定義
+// カテゴリ定義 (簡略化)
 const CATEGORY_MAP: Record<string, { value: string; label: string }[]> = {
     'English': [{ value: 'grammar', label: '文法' }, { value: 'business', label: 'ビジネス' }, { value: 'conversation', label: '日常会話' }],
     'default': [{ value: 'grammar', label: '基礎' }, { value: 'conversation', label: '会話' }, { value: 'culture', label: '文化・コラム' }]
@@ -26,12 +26,16 @@ export default function AdminPage() {
     const router = useRouter();
     const [isAdmin, setIsAdmin] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'textbook' | 'comments' | 'daily' | 'inquiry' | 'roadmap' | 'setup' | 'batch' | 'finder' | 'factory' | 'reading' | 'rawdata_import'>('setup');
+    // ★タブ追加: users
+    const [activeTab, setActiveTab] = useState<'textbook' | 'comments' | 'daily' | 'inquiry' | 'roadmap' | 'setup' | 'batch' | 'finder' | 'factory' | 'reading' | 'rawdata_import' | 'users'>('setup');
 
     const [currentAdminSubject, setCurrentAdminSubject] = useState('English');
     const isCanceledRef = useRef(false);
 
     // --- 各種ステート ---
+
+    // User Management (New)
+    const [targetEmail, setTargetEmail] = useState('');
 
     // Raw Data Import
     const [importVideoId, setImportVideoId] = useState('');
@@ -151,6 +155,24 @@ export default function AdminPage() {
     // 機能ロジック群
     // ==========================================
 
+    // --- ★ユーザー管理 (Pro化) ---
+    const handleUpgradeUser = async () => {
+        if (!targetEmail) return;
+        if (!confirm(`${targetEmail} をProプランにアップグレードしますか？`)) return;
+
+        // 今回は「ユーザーID」を直接入力させる方式
+        const { error } = await supabase
+            .from('profiles')
+            .update({ is_pro: true, plan_type: 'pro_lifetime' })
+            .eq('id', targetEmail);
+
+        if (error) alert('失敗しました: ' + error.message);
+        else {
+            alert('アップグレード成功！');
+            setTargetEmail('');
+        }
+    };
+
     // --- 0. Raw Data Import (手動インポート) ---
     const handleFormatSave = async () => {
         if (!importVideoId || !rawJsonInput) {
@@ -163,7 +185,6 @@ export default function AdminPage() {
         try {
             let parsedJson;
             try {
-                // JSONが有効かチェックし、文字列をオブジェクトに変換
                 parsedJson = JSON.parse(rawJsonInput.trim());
                 if (!Array.isArray(parsedJson)) throw new Error('Input must be a JSON array.');
             } catch (e: any) {
@@ -172,7 +193,6 @@ export default function AdminPage() {
                 return;
             }
 
-            // AI整形APIに生データをPOST
             const res = await fetch('/api/transcript/format_only', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -185,11 +205,10 @@ export default function AdminPage() {
             }
 
             const data = await res.json();
-
             setImportLog(`✅ Success: ${data.count} lines formatted and saved to optimized_transcripts.`);
             setRawJsonInput('');
             setImportVideoId('');
-            fetchMissingVideos(); // リストを更新
+            fetchMissingVideos();
 
         } catch (e: any) {
             setImportLog(`❌ Fatal Error during processing: ${e.message}`);
@@ -218,6 +237,7 @@ export default function AdminPage() {
         } catch (e: any) { alert('検索失敗: ' + e.message); } finally { setIsGenerating(false); }
     };
 
+    // 2. 動画一括保存 (Finder)
     const handleSaveAllFoundVideos = async () => {
         if (foundVideos.length === 0) return;
         if (!confirm(`${foundVideos.length}件の動画の字幕を生成・保存しますか？`)) return;
@@ -236,40 +256,7 @@ export default function AdminPage() {
         setIsGenerating(false); alert('一括保存が完了しました！');
     };
 
-    // --- 2. バッチ処理 (Batch) ---
-    const runBatchProcess = async () => {
-        if (missingVideos.length === 0) return;
-        if (!confirm(`${missingVideos.length}件の動画の字幕データを取得・整形しますか？`)) return;
-        isCanceledRef.current = false;
-        setIsGenerating(true); setProcessLog([]);
-        let totalSuccess = 0;
-        const totalVideos = missingVideos.length;
-
-        for (let i = 0; i < totalVideos; i++) {
-            if (isCanceledRef.current) break;
-            setProcessingIndex(i); const video = missingVideos[i];
-            const startTime = Date.now();
-            setProcessLog(prev => [`⏳ Processing (${i + 1}/${totalVideos}): ${video.title}...`, ...prev]);
-            try {
-                const res = await fetch(`/api/transcript?videoId=${video.id}&lang=en`);
-                const duration = (Date.now() - startTime) / 1000;
-                if (res.ok) { totalSuccess++; setProcessLog(prev => [`✅ Success (${video.id}) [Time: ${duration.toFixed(1)}s]`, ...prev]); }
-                else {
-                    const errorText = await res.text();
-                    setProcessLog(prev => [`❌ Failed (Status ${res.status}): ${video.id} [${errorText.substring(0, 50)}]`, ...prev]);
-                }
-            } catch (e) { setProcessLog(prev => [`❌ Fatal Error: ${e}`, ...prev]); }
-            await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        setIsGenerating(false); setProcessingIndex(null);
-        if (!isCanceledRef.current) {
-            setProcessLog(prev => [`\n--- FINISHED ---`, `🎉 Batch Complete: ${totalSuccess}/${totalVideos} videos processed.`, ...prev]);
-        }
-        fetchMissingVideos();
-    };
-
-    // --- 3. コンテンツ量産 (Factory) ---
+    // 3. ファクトリー (量産)
     const runContentFactory = async () => {
         const subjects = factoryTarget === 'all' ? SETUP_SUBJECTS : [currentAdminSubject];
         const types = [factoryContentType];
@@ -314,20 +301,40 @@ export default function AdminPage() {
         alert('全工程が完了しました！');
     };
 
-    // --- 4. セットアップ ---
-    const runSetupStep = async (step: number) => {
-        setIsGenerating(true);
-        try {
-            const endpoint = step === 1 ? '/api/admin/full_setup' : '/api/ai/textbook_bulk';
-            const body = { subject: currentAdminSubject };
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), });
-            const data = await res.json();
-            if (!res.ok || data.error) throw new Error(data.error || 'API Error');
-            if (step === 1) { alert(`ステップ1完了`); setSetupStep(2); } else if (step === 2) { alert(`ステップ2完了`); setSetupStep(3); }
-        } catch (e: any) { alert(`セットアップエラー: ${e.message}`); } finally { setIsGenerating(false); }
+    // 4. バッチ処理
+    const runBatchProcess = async () => {
+        if (missingVideos.length === 0) return;
+        if (!confirm(`${missingVideos.length}件の動画の字幕データを取得・整形しますか？`)) return;
+        isCanceledRef.current = false; // 中断フラグをリセット
+        setIsGenerating(true); setProcessLog([]);
+        let totalSuccess = 0;
+        const totalVideos = missingVideos.length;
+
+        for (let i = 0; i < totalVideos; i++) {
+            if (isCanceledRef.current) break;
+            setProcessingIndex(i); const video = missingVideos[i];
+            const startTime = Date.now();
+            setProcessLog(prev => [`⏳ Processing (${i + 1}/${totalVideos}): ${video.title}...`, ...prev]);
+            try {
+                const res = await fetch(`/api/transcript?videoId=${video.id}&lang=en`);
+                const duration = (Date.now() - startTime) / 1000;
+                if (res.ok) { totalSuccess++; setProcessLog(prev => [`✅ Success (${video.id}) [Time: ${duration.toFixed(1)}s]`, ...prev]); }
+                else {
+                    const errorText = await res.text();
+                    setProcessLog(prev => [`❌ Failed (Status ${res.status}): ${video.id} [${errorText.substring(0, 50)}]`, ...prev]);
+                }
+            } catch (e) { setProcessLog(prev => [`❌ Fatal Error: ${e}`, ...prev]); }
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 待機時間
+        }
+
+        setIsGenerating(false); setProcessingIndex(null);
+        if (!isCanceledRef.current) {
+            setProcessLog(prev => [`\n--- FINISHED ---`, `🎉 Batch Complete: ${totalSuccess}/${totalVideos} videos processed.`, ...prev]);
+        }
+        fetchMissingVideos();
     };
 
-    // --- 5. 教科書個別生成 ---
+    // 5. 個別生成・保存
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
@@ -343,7 +350,6 @@ export default function AdminPage() {
             let rawTitle = ''; let body = data.content;
             if (titleLineIndex !== -1) { rawTitle = lines[titleLineIndex].replace('# ', '').trim(); const bodyLines = lines.filter((_: string, i: number) => i !== titleLineIndex); body = bodyLines.join('\n').trim(); } else { rawTitle = data.generatedTopic || topic || 'Untitled'; }
             setTitle(rawTitle); setContent(body);
-            if (!topic && data.generatedTopic) setTopic(data.generatedTopic);
         } catch (e: any) { alert('AI生成失敗: ' + e.message); } finally { setIsGenerating(false); }
     };
 
@@ -362,7 +368,31 @@ export default function AdminPage() {
         } catch (e: any) { alert('保存エラー: ' + e.message); } finally { setIsSaving(false); }
     };
 
-    // --- 6. 読み物生成 ---
+    const handleAiDailyPick = async () => {
+        setIsGenerating(true);
+        try {
+            const res = await fetch('/api/ai/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: currentAdminSubject }) });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setTopic(data.videoId); setContent(data.message); setDailyQuiz(data.quiz);
+            alert(`AI選定完了！\nテーマ: ${data.topic}`);
+        } catch (e) { alert('AI選定失敗'); } finally { setIsGenerating(false); }
+    };
+    const handleSaveDaily = async () => { const { error } = await supabase.from('daily_picks').upsert([{ date: new Date().toISOString().split('T')[0], video_id: topic, message: content, quiz_data: dailyQuiz, subject: currentAdminSubject }], { onConflict: 'date' }); if (!error) alert('設定しました！'); else alert('エラー: ' + error.message); };
+
+    const handleGenerateRoadmap = async () => {
+        setIsGenerating(true);
+        try {
+            const res = await fetch('/api/admin/roadmap', {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ level: roadmapLevel, keywords: roadmapQuery, targetSubject: currentAdminSubject }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            alert(`成功！ ${data.count}件の動画を追加しました。`);
+        } catch (e: any) { alert('エラー: ' + e.message); } finally { setIsGenerating(false); }
+    };
+
     const handleGenerateReading = async () => {
         setIsGenerating(true);
         try {
@@ -378,32 +408,17 @@ export default function AdminPage() {
         } catch (e: any) { alert('エラー: ' + e.message); } finally { setIsGenerating(false); }
     };
 
-    // --- 7. ロードマップ生成 ---
-    const handleGenerateRoadmap = async () => {
+    const runSetupStep = async (step: number) => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/admin/roadmap', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ level: roadmapLevel, keywords: roadmapQuery, targetSubject: currentAdminSubject }),
-            });
+            const endpoint = step === 1 ? '/api/admin/full_setup' : '/api/ai/textbook_bulk';
+            const body = { subject: currentAdminSubject };
+            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), });
             const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            alert(`成功！ ${data.count}件の動画を追加しました。`);
-        } catch (e: any) { alert('エラー: ' + e.message); } finally { setIsGenerating(false); }
+            if (!res.ok || data.error) throw new Error(data.error || 'API Error');
+            if (step === 1) { alert(`ステップ1完了`); setSetupStep(2); } else if (step === 2) { alert(`ステップ2完了`); setSetupStep(3); }
+        } catch (e: any) { alert(`セットアップエラー: ${e.message}`); } finally { setIsGenerating(false); }
     };
-
-    // --- 8. 日替わり ---
-    const handleAiDailyPick = async () => {
-        setIsGenerating(true);
-        try {
-            const res = await fetch('/api/ai/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: currentAdminSubject }) });
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            setTopic(data.videoId); setContent(data.message); setDailyQuiz(data.quiz);
-            alert(`AI選定完了！\nテーマ: ${data.topic}`);
-        } catch (e) { alert('AI選定失敗'); } finally { setIsGenerating(false); }
-    };
-    const handleSaveDaily = async () => { const { error } = await supabase.from('daily_picks').upsert([{ date: new Date().toISOString().split('T')[0], video_id: topic, message: content, quiz_data: dailyQuiz, subject: currentAdminSubject }], { onConflict: 'date' }); if (!error) alert('設定しました！'); else alert('エラー: ' + error.message); };
 
     const insertVideo = (id: string) => { const tag = `\n[[video:${id}:0:動画タイトル]]\n`; setContent(prev => prev + tag); };
 
@@ -443,6 +458,10 @@ export default function AdminPage() {
                     <button onClick={() => setActiveTab('comments')} className={`pb-2 px-4 font-bold whitespace-nowrap ${activeTab === 'comments' ? 'text-red-400 border-b-2 border-red-400' : 'text-gray-500'}`}>💬 コメント</button>
                     <button onClick={() => setActiveTab('inquiry')} className={`pb-2 px-4 font-bold whitespace-nowrap flex items-center gap-2 ${activeTab === 'inquiry' ? 'text-green-400 border-b-2 border-green-400' : 'text-gray-500'}`}>
                         📮 受信箱 {unreadCount > 0 && <span className="bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">{unreadCount}</span>}
+                    </button>
+                    {/* ★追加: ユーザー管理タブボタン */}
+                    <button onClick={() => setActiveTab('users')} className={`pb-2 px-4 font-bold whitespace-nowrap flex items-center gap-2 ${activeTab === 'users' ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-500'}`}>
+                        <Users size={18} /> ユーザー管理
                     </button>
                 </div>
 
@@ -628,8 +647,37 @@ export default function AdminPage() {
                         </div>
                     </div>
                 )}
+                {activeTab === 'setup' && (
+                    <div className="bg-gray-800 p-8 rounded-xl border border-green-600 space-y-6 animate-fade-in">
+                        <h2 className="font-bold text-2xl text-green-400 mb-4">🚀 New Subject Setup ({currentAdminSubject})</h2>
+                        <div className="pt-4 border-t border-gray-700">
+                            {setupStep === 1 && (<button onClick={() => runSetupStep(1)} disabled={isGenerating} className="w-full py-4 rounded-lg font-bold text-lg bg-green-600 hover:bg-green-500 transition text-white">{isGenerating ? <span className='flex items-center justify-center'><RotateCw className='w-5 h-5 mr-2 animate-spin' />Generating...</span> : `1. 単語帳とテスト問題を作成`}</button>)}{setupStep === 2 && (<button onClick={() => runSetupStep(2)} disabled={isGenerating} className="w-full py-4 rounded-lg font-bold text-lg bg-blue-600 hover:bg-blue-500 transition text-white">{isGenerating ? <span className='flex items-center justify-center'><RotateCw className='w-5 h-5 mr-2 animate-spin' />Generating...</span> : `2. 基礎教科書を生成・登録`}</button>)}{setupStep === 3 && (<div className="text-center text-green-400 text-xl font-bold">✅ セットアップ完了！</div>)}
+                        </div>
+                    </div>
+                )}
+
+                {/* 10. ★追加: ユーザー管理 (Users) */}
+                {activeTab === 'users' && (
+                    <div className="bg-gray-800 p-8 rounded-xl border border-blue-500 space-y-6 animate-fade-in">
+                        <h2 className="font-bold text-2xl text-blue-400">👥 User Management (Crowdfunding Rewards)</h2>
+                        <div className="space-y-4">
+                            <p className="text-gray-300">支援者のユーザーIDを入力して、Proプランを付与します。</p>
+                            <input
+                                type="text"
+                                value={targetEmail}
+                                onChange={(e) => setTargetEmail(e.target.value)}
+                                placeholder="User ID (UUID)"
+                                className="w-full p-3 rounded bg-gray-900 border border-gray-600 text-white"
+                            />
+                            <button onClick={handleUpgradeUser} className="w-full py-3 bg-blue-600 hover:bg-blue-500 rounded font-bold text-white">
+                                Grant Pro Access (Lifetime)
+                            </button>
+                        </div>
+                    </div>
+                )}
             </div>
-            {isSearchOpen && <VideoSearchModal onClose={() => setIsSearchOpen(false)} onSelect={(id) => { if (activeTab === 'daily') setTopic(id); else insertVideo(id); setIsSearchOpen(false); }} />}
         </main>
     );
 }
+
+

@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase';
 type Video = {
     video_id: string;
     title: string;
-    source: string; // 'Roadmap' or 'Library'
+    source: string; // 'Roadmap' or 'Library' or 'Direct'
 };
 
 type Props = {
@@ -30,7 +30,7 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
         if (e) e.preventDefault();
         setIsSearching(true);
 
-        // 1. ロードマップから検索
+        // 1. ロードマップから検索 (タイトル または ID)
         let roadmapQuery = supabase
             .from('roadmap_items')
             .select('video_id, title')
@@ -38,17 +38,18 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
             .limit(20);
 
         if (query) {
-            roadmapQuery = roadmapQuery.ilike('title', `%${query}%`);
+            // タイトルが部分一致 OR IDが完全一致
+            roadmapQuery = roadmapQuery.or(`title.ilike.%${query}%,video_id.eq.${query}`);
         }
 
-        // 2. ライブラリ動画から検索
+        // 2. ライブラリ動画から検索 (タイトル または ID)
         let libraryQuery = supabase
             .from('library_videos')
             .select('video_id, title')
             .limit(20);
 
         if (query) {
-            libraryQuery = libraryQuery.ilike('title', `%${query}%`);
+            libraryQuery = libraryQuery.or(`title.ilike.%${query}%,video_id.eq.${query}`);
         }
 
         const [roadmapRes, libraryRes] = await Promise.all([roadmapQuery, libraryQuery]);
@@ -72,6 +73,15 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
             }
         });
 
+        // ★改良: 検索結果が0件でも、入力が「動画IDっぽい(11文字)」なら、直接選択肢として出す
+        if (results.length === 0 && query.length === 11) {
+            results.push({
+                video_id: query,
+                title: `ID: ${query} (未登録動画)`,
+                source: 'Direct Input'
+            });
+        }
+
         setVideos(results);
         setIsSearching(false);
     };
@@ -80,18 +90,18 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
         <div className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 animate-fade-in">
             <div className="bg-white w-full max-w-2xl rounded-xl overflow-hidden flex flex-col max-h-[80vh]">
                 <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-                    <h3 className="font-bold text-lg text-gray-800">📚 ライブラリから動画を選択</h3>
+                    <h3 className="font-bold text-lg text-gray-800">📚 動画を選択</h3>
                     <button onClick={onClose} className="text-2xl text-gray-400 hover:text-gray-600">×</button>
                 </div>
 
                 <div className="p-4 bg-blue-50">
-                    <p className="text-xs text-blue-600 mb-2">※ 通信量を節約するため、YouTube検索ではなくアプリ内の動画から探します。</p>
+                    <p className="text-xs text-blue-600 mb-2">※ 「動画タイトル」または「YouTube ID」で検索できます。</p>
                     <form onSubmit={handleSearch} className="flex gap-2">
                         <input
                             type="text"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="タイトルで検索..."
+                            placeholder="タイトル または 動画ID..."
                             className="flex-1 border p-3 rounded-lg text-black"
                         />
                         <button
@@ -111,7 +121,7 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
                             onClick={() => { onSelect(video.video_id); onClose(); }}
                             className="flex gap-4 bg-white p-3 rounded-lg shadow-sm hover:shadow-md cursor-pointer transition items-center"
                         >
-                            <span className={`text-xs px-2 py-1 rounded font-bold ${video.source === 'Roadmap' ? 'bg-purple-100 text-purple-600' : 'bg-green-100 text-green-600'}`}>
+                            <span className={`text-xs px-2 py-1 rounded font-bold ${video.source === 'Roadmap' ? 'bg-purple-100 text-purple-600' : video.source === 'Library' ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-600'}`}>
                                 {video.source}
                             </span>
                             <div className="flex-1 min-w-0">
@@ -122,10 +132,15 @@ export default function InternalVideoSearchModal({ onSelect, onClose, currentSub
                         </div>
                     ))}
                     {videos.length === 0 && !isSearching && (
-                        <p className="text-center text-gray-400 mt-10">動画が見つかりません。<br />ロードマップを生成するか、URLから直接IDを入力してください。</p>
+                        <div className="text-center text-gray-400 mt-10">
+                            <p>動画が見つかりません。</p>
+                            <p className="text-xs mt-2">※ IDを直接入力して検索すると、未登録の動画も選択できます。</p>
+                        </div>
                     )}
                 </div>
             </div>
         </div>
     );
 }
+
+

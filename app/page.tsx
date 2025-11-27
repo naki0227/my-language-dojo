@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
-import YouTube, { YouTubePlayer } from 'react-youtube';
+import { useState, useEffect, Suspense, useRef, useCallback } from 'react';
+// import YouTube, { YouTubePlayer } from 'react-youtube'; // Removed
 import { supabase } from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -12,8 +12,9 @@ import ProfileModal from '@/components/ProfileModal';
 import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import AIChatButton from '@/components/AIChatButton';
-import InternalVideoSearchModal from '@/components/InternalVideoSearchModal '; // 内部検索を使用
+import InternalVideoSearchModal from '@/components/InternalVideoSearchModal ';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
+import { ExternalLink, AlertCircle, HelpCircle } from 'lucide-react';
 
 // --- 型定義 ---
 type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
@@ -44,10 +45,148 @@ const CEFR_LEVELS = [
 
 const XP_CAP = 1000;
 
+interface PlayerAreaProps {
+  videoId: string;
+  isAudioOnly: boolean;
+  setIsAudioOnly: (value: boolean) => void;
+  playError: boolean;
+  setPlayError: (value: boolean) => void;
+  onPlayerReady: (player: any) => void;
+}
+
+const PlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playError, setPlayError, onPlayerReady }: PlayerAreaProps) => {
+  const playerRef = useRef<any | null>(null);
+
+  useEffect(() => {
+    if (playError || isAudioOnly) return;
+
+    const initPlayer = () => {
+      if ((window as any).YT && (window as any).YT.Player) {
+        try {
+          if (playerRef.current) {
+            try { playerRef.current.destroy(); } catch (e) { console.error(e); }
+          }
+
+          playerRef.current = new (window as any).YT.Player('youtube-player', {
+            events: {
+              'onReady': (e: any) => onPlayerReady(e.target),
+              'onError': (e: any) => {
+                console.warn("YouTube Player Error:", e.data);
+                setPlayError(true);
+              }
+            }
+          });
+        } catch (e) {
+          console.error("Player init error", e);
+        }
+      }
+    };
+
+    if (!(window as any).YT) {
+      const tag = document.createElement('script');
+      tag.src = "https://www.youtube.com/iframe_api";
+      const firstScriptTag = document.getElementsByTagName('script')[0];
+      firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
+      (window as any).onYouTubeIframeAPIReady = initPlayer;
+    } else {
+      initPlayer();
+    }
+
+    return () => {
+      if (playerRef.current) {
+        try { playerRef.current.destroy(); } catch (e) { console.error(e); }
+      }
+    };
+  }, [videoId, playError, isAudioOnly, onPlayerReady, setPlayError]);
+
+  return (
+    <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl bg-black ${isAudioOnly ? 'h-12' : ''} relative group`}>
+      {playError ? (
+        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center z-10">
+          <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
+          <h3 className="text-xl font-bold mb-2">埋め込み再生できません</h3>
+          <p className="text-sm text-gray-400 mb-6">YouTube公式で視聴してください。</p>
+          <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer" className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition transform hover:scale-105">
+            <ExternalLink size={20} /> YouTubeで開く
+          </a>
+        </div>
+      ) : isAudioOnly ? (
+        <div className="w-full h-full flex items-center justify-center text-white text-xs cursor-pointer" onClick={() => setIsAudioOnly(false)}>🙈 Audio Only (Tap)</div>
+      ) : (
+        <iframe
+          id="youtube-player"
+          width="100%"
+          height="100%"
+          src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1`}
+          title="YouTube video player"
+          frameBorder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+          allowFullScreen
+          className="w-full h-full"
+        />
+      )}
+
+      {!playError && !isAudioOnly && (
+        <button
+          onClick={() => setPlayError(true)}
+          className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full z-20 backdrop-blur-sm transition opacity-70 hover:opacity-100"
+          title="動画が再生できない場合はこちら (YouTubeで開く)"
+        >
+          <HelpCircle size={24} />
+        </button>
+      )}
+    </div>
+  );
+};
+
+interface TranscriptListProps {
+  isSubtitleLoading: boolean;
+  subtitles: Subtitle[];
+  isPro: boolean;
+  manualTargetText: string | null;
+  setManualTargetText: (text: string | null) => void;
+  handleSeek: (ms: number) => void;
+  handleWordClick: (word: string, e: React.MouseEvent) => void;
+  showTranslation: boolean;
+  selectedLangs: string[];
+}
+
+const TranscriptList = ({
+  isSubtitleLoading,
+  subtitles,
+  isPro,
+  manualTargetText,
+  setManualTargetText,
+  handleSeek,
+  handleWordClick,
+  showTranslation,
+  selectedLangs
+}: TranscriptListProps) => (
+  <div className="space-y-3">
+    {isSubtitleLoading ? (
+      <div className="text-center py-10 text-gray-500 animate-pulse">字幕データを取得中...</div>
+    ) : subtitles.length > 0 ? (
+      subtitles.map((sub, i) => (
+        <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
+          <div className="mb-1">{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
+          {showTranslation && sub.translation && (<div className="mt-1 text-sm text-blue-600 font-bold">{sub.translation}</div>)}
+          {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-sm text-gray-500 mt-1 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-1">{lang.toUpperCase()}:</span>{sub.translations[lang]}</div>) : null))}
+        </div>
+      ))
+    ) : (
+      <div className="text-center py-10 opacity-60">
+        <p className="mb-2 font-bold">字幕データがありません</p>
+        <p className="text-xs">Adminで生成されているか確認してください。</p>
+      </div>
+    )}
+  </div>
+);
+
 function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const initialVideoId = searchParams.get('videoId') || 'arj7oStGLkU';
+  const paramVideoId = searchParams.get('videoId');
+  const initialVideoId = 'arj7oStGLkU';
 
   // ユーザー情報
   const [userId, setUserId] = useState<string | null>(null);
@@ -68,8 +207,46 @@ function HomeContent() {
 
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
-  const [player, setPlayer] = useState<YouTubePlayer | null>(null);
+  const playerRef = useRef<any | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
+
+  // ... (other state)
+
+  // ...
+
+  const onReady = useCallback((target: any) => {
+    if (target && typeof target.playVideo === 'function') {
+      playerRef.current = target;
+      setPlayError(false);
+      const start = searchParams.get('start');
+      if (start) { target.seekTo(parseInt(start), true); target.playVideo(); }
+    }
+  }, [searchParams]);
+
+  // ...
+
+  const handleSeek = (ms: number) => {
+    const p = playerRef.current;
+    if (p && typeof p.seekTo === 'function') {
+      p.seekTo(ms / 1000, true);
+      p.playVideo();
+    }
+  };
+
+  useEffect(() => {
+    const i = setInterval(() => {
+      const p = playerRef.current;
+      if (p && typeof p.getPlayerState === 'function' && p.getPlayerState() === 1) {
+        setCurrentTime(p.getCurrentTime());
+      }
+    }, 100);
+    return () => clearInterval(i);
+  }, []); // No dependency on player
+
+  // ...
+
+  // プレイヤーの初期化（APIロード後または再レンダリング時）
+
 
   const [selectedLangs, setSelectedLangs] = useState<string[]>([]);
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
@@ -88,6 +265,13 @@ function HomeContent() {
   const [targetLang, setTargetLang] = useState('ja');
   const [loadedLang, setLoadedLang] = useState<string | null>(null);
   const [isSubtitleLoading, setIsSubtitleLoading] = useState(false);
+  const [playError, setPlayError] = useState(false);
+
+  // ★画面サイズ判定用
+  const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  const loadedVideoIdRef = useRef<string | null>(null);
 
   const getThemeStyles = () => {
     switch (userProfile.theme) {
@@ -96,6 +280,15 @@ function HomeContent() {
       default: return 'font-sans text-base bg-gray-50 text-gray-800';
     }
   };
+
+  // ★画面サイズ監視
+  useEffect(() => {
+    setMounted(true);
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   useEffect(() => {
     const checkSession = async () => {
@@ -108,17 +301,36 @@ function HomeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    const paramVideoId = searchParams.get('videoId');
-    if (paramVideoId && paramVideoId !== videoId) {
-      loadVideo(paramVideoId);
-    } else if (!videoId && paramVideoId) {
-      loadVideo(paramVideoId);
-    } else if (!videoId && initialVideoId) {
-      loadVideo(initialVideoId);
-    }
+  const loadVideo = useCallback(async (id: string) => {
+    if (id === loadedVideoIdRef.current) return;
+    loadedVideoIdRef.current = id;
+
+    setVideoId(id);
+    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
+    setSelectedLangs([]); setLoadedLang(null); setShowTranslation(false);
+    setIsSubtitleLoading(true);
+    setPlayError(false);
+
+    try {
+      const res = await fetch(`/api/transcript?videoId=${id}`);
+      const data = await res.json();
+      if (data.error) {
+        console.error(`字幕エラー: ${data.error}`);
+      } else {
+        const items = Array.isArray(data) ? data : [];
+        const formatted = items.map((item: any) => ({ ...item, translations: {} }));
+        setSubtitles(formatted);
+        logStudyActivity();
+      }
+    } catch (e) { console.error('通信エラー', e); }
+    finally { setIsSubtitleLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
+  }, []);
+
+  useEffect(() => {
+    const targetId = paramVideoId || initialVideoId;
+    if (targetId) loadVideo(targetId);
+  }, [paramVideoId, loadVideo]);
 
   const fetchProfile = async (uid: string) => {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', uid).single();
@@ -192,30 +404,6 @@ function HomeContent() {
   const handleGoalChange = async () => {
     const newGoal = prompt("目標を入力", userProfile.goal || "");
     if (newGoal && userId) { await supabase.from('profiles').update({ goal: newGoal }).eq('id', userId); setUserProfile(prev => ({ ...prev, goal: newGoal })); }
-  };
-
-  const loadVideo = async (idOverride?: string) => {
-    const targetId = idOverride || videoId;
-    if (!targetId) return;
-    if (idOverride) setVideoId(targetId);
-
-    setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
-    setSelectedLangs([]); setLoadedLang(null); setShowTranslation(false);
-    setIsSubtitleLoading(true);
-
-    try {
-      const res = await fetch(`/api/transcript?videoId=${targetId}`);
-      const data = await res.json();
-      if (data.error) {
-        console.error(`字幕エラー: ${data.error}`);
-      } else {
-        const items = Array.isArray(data) ? data : [];
-        const formatted = items.map((item: any) => ({ ...item, translations: {} }));
-        setSubtitles(formatted);
-        logStudyActivity();
-      }
-    } catch (e) { console.error('通信エラー', e); }
-    finally { setIsSubtitleLoading(false); }
   };
 
   const fetchTranslations = async (langsToFetch: string[]) => {
@@ -309,30 +497,16 @@ function HomeContent() {
     if (userProfile.learning_target !== 'English') {
       setSelectedWord(cleanWord); setDictData(null); setIsLoading(true);
       try {
-        // ★修正: 新しい抽象化APIを叩く
-        const res = await fetch('/api/v1/ai', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            type: 'analyze',
-            payload: { word: cleanWord, targetLang: userProfile.learning_target }
-          })
+        const aiRes = await fetch('/api/ai/analyze', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ word: cleanWord, targetLang: userProfile.learning_target })
         });
-        const data = await res.json();
-        if (data.error) throw new Error(data.error);
-
-        const result = JSON.parse(data.data); // GeminiはJSON文字列を返すためパースが必要
-
+        const data = await aiRes.json();
         setDictData({
-          word: cleanWord,
-          translation: result.translation || "翻訳できませんでした",
-          sourceLang: result.sourceLang || userProfile.learning_target,
-          meanings: [{ partOfSpeech: result.partOfSpeech || 'N/A', definitions: [{ definition: result.definition }] }]
+          word: cleanWord, translation: data.translation || "翻訳できませんでした",
+          sourceLang: data.sourceLang, meanings: []
         });
-
-      } catch (e: any) {
-        setDictData({ word: cleanWord, translation: `エラー: ${e.message}`, sourceLang: userProfile.learning_target });
-      }
+      } catch { setDictData({ word: cleanWord, translation: "エラー", sourceLang: userProfile.learning_target }); }
       finally { setIsLoading(false); }
       return;
     }
@@ -366,22 +540,23 @@ function HomeContent() {
     finally { setIsSaving(false); }
   };
 
-  const onReady = (e: { target: YouTubePlayer }) => {
-    setPlayer(e.target);
-    const start = searchParams.get('start');
-    if (start) { e.target.seekTo(parseInt(start), true); e.target.playVideo(); }
-  };
-  const handleSeek = (ms: number) => player?.seekTo(ms / 1000, true);
-  useEffect(() => {
-    const i = setInterval(() => { if (player?.getPlayerState() === 1) setCurrentTime(player.getCurrentTime()); }, 100);
-    return () => clearInterval(i);
-  }, [player]);
-  const playAudio = () => dictData?.audio && new Audio(dictData.audio).play();
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
 
-  if (!userId) return <div className="p-10 text-center">Loading...</div>;
+
+  if (!userId || !mounted) return <div className="p-10 text-center">Loading...</div>;
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
+
+  // コンポーネント: 字幕リスト
+
+
+
+
+
+
+
+
+  const playAudio = () => dictData?.audio && new Audio(dictData.audio).play();
+  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
 
   return (
     <main className={`h-screen flex flex-col bg-gray-50 transition-colors duration-500 ${getThemeStyles()} overflow-hidden`}>
@@ -397,7 +572,7 @@ function HomeContent() {
             {userProfile.learning_target} Dojo
           </h1>
           <div className="scale-75 origin-left">
-            <UserStatus level={currentLevelData.level_result.split(' ')[0] || 'A1'} xp={currentLevelData.xp} nextLevelXp={XP_CAP} />
+            <UserStatus level={currentLevelData.level_result.split(' ')[0] || '1'} xp={currentLevelData.xp} nextLevelXp={XP_CAP} />
           </div>
         </div>
         <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
@@ -415,7 +590,6 @@ function HomeContent() {
                   {CEFR_LEVELS.map(level => (<option key={level} value={level}>{level}</option>))}
                 </select>
               </div>
-
               <div>
                 <p className="mb-1 font-bold text-sm text-gray-500">学習対象</p>
                 <div className="grid grid-cols-3 gap-2">
@@ -433,10 +607,9 @@ function HomeContent() {
                   <button onClick={() => handleTargetLanguageChange('Programming')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Programming' ? 'bg-red-100 text-red-700' : 'hover:bg-gray-50'}`}>💻 Code</button>
                 </div>
               </div>
-
               <Link href="/dashboard" className="block w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-center py-3 rounded-lg font-bold shadow-md hover:opacity-90">🏠 ダッシュボード</Link>
               <Link href="/dashboard/archive" className="block w-full bg-gray-100 text-gray-700 text-center py-2 rounded-lg font-bold hover:bg-gray-200 text-sm">📅 過去のピックアップ</Link>
-
+              <Link href="/pricing" className="block w-full bg-yellow-100 text-yellow-700 text-center py-2 rounded-lg font-bold hover:bg-yellow-200 text-sm">💎 プラン変更 (Pro)</Link>
               <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 border rounded hover:bg-red-50">ログアウト</button>
             </div>
           </div>
@@ -445,32 +618,82 @@ function HomeContent() {
 
       {/* サブメニュー */}
       <div className={`shrink-0 w-full flex gap-2 overflow-x-auto p-2 border-b ${isPro ? 'bg-gray-900 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200'}`}>
-        {/* 動画検索ボタン */}
         <button onClick={() => setIsSearchOpen(true)} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔍 検索</button>
         <Link href="/vocab" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 単語</Link>
         <Link href="/drill" className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔥 ドリル</Link>
         <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📖 教科書</Link>
         <Link href="/reading" className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 読み物</Link>
-        <button onClick={handleSaveToLibrary} disabled={isRegistering || subtitles.length === 0} className="bg-purple-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap disabled:opacity-50">💾 保存</button>
+        <Link href="/typetalk" className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">⌨️ 会話</Link>
+        <Link href="/writing" className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">✍️ 英作文</Link>
+        <Link href="/podcast" className="bg-pink-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🎧 Podcast</Link>
       </div>
 
       {/* === レイアウト本体 === */}
       <div className="flex-1 flex flex-col md:flex-row overflow-hidden">
         {/* スマホビュー */}
-        <div className="md:hidden flex flex-col h-full w-full">
-          <div className={`shrink-0 w-full bg-black transition-all duration-300 ${isAudioOnly ? 'h-12' : 'aspect-video'}`}>
-            {isAudioOnly ? (
-              <div className="w-full h-full flex items-center justify-center text-white text-xs cursor-pointer" onClick={() => setIsAudioOnly(false)}>🙈 Audio Only (Tap)</div>
-            ) : (
-              <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%', playerVars: { autoplay: 0 } }} className="w-full h-full" />
-            )}
-          </div>
-          {!isAudioOnly && <button onClick={() => setIsAudioOnly(true)} className="shrink-0 w-full py-2 bg-gray-200 text-xs font-bold text-gray-600 border-b">🙉 Audio Only</button>}
+        {isMobile && (
+          <div className="flex flex-col h-full w-full">
+            <PlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
+            {!isAudioOnly && !playError && <button onClick={() => setIsAudioOnly(true)} className="shrink-0 w-full py-2 bg-gray-200 text-xs font-bold text-gray-600 border-b">🙉 Audio Only</button>}
 
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
-            <div className={`rounded-lg shadow p-4 ${isPro ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
-              <div className="flex justify-between items-center mb-2 relative">
-                <h2 className="text-sm opacity-50 font-bold">Transcript</h2>
+            <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
+              <div className={`rounded-lg shadow p-4 ${isPro ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
+                {/* スマホ用字幕ヘッダー */}
+                <div className="flex justify-between items-center mb-2 relative">
+                  <h2 className="text-sm opacity-50 font-bold">Transcript</h2>
+                  <div className="flex items-center gap-2">
+                    {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
+                    <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+                      🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
+                    </button>
+                  </div>
+                  {isLangMenuOpen && (
+                    <div className="absolute right-0 top-8 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
+                      <div className="space-y-1">
+                        {SUPPORTED_LANGUAGES.map(lang => (
+                          <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
+                            <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+                <TranscriptList
+                  isSubtitleLoading={isSubtitleLoading}
+                  subtitles={subtitles}
+                  isPro={isPro}
+                  manualTargetText={manualTargetText}
+                  setManualTargetText={setManualTargetText}
+                  handleSeek={handleSeek}
+                  handleWordClick={handleWordClick}
+                  showTranslation={showTranslation}
+                  selectedLangs={selectedLangs}
+                />
+              </div>
+              <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
+              <CommentSection videoId={videoId} />
+            </div>
+          </div>
+        )}
+
+        {/* PCビュー */}
+        {!isMobile && (
+          <div className="flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
+            <div className="flex-1 overflow-y-auto space-y-6 pr-2">
+              {!isKids && userId && <Heatmap userId={userId} />}
+              <PlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
+              <button onClick={() => setIsAudioOnly(!isAudioOnly)} className="w-full py-2 bg-gray-200 text-sm font-bold rounded">Switch to Audio Only</button>
+              <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
+                <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
+              </div>
+              <CommentSection videoId={videoId} />
+            </div>
+
+            <div className={`w-1/3 rounded-lg shadow-lg border h-full flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
+              {/* PC用字幕ヘッダー */}
+              <div className="p-4 border-b flex justify-between items-center relative">
+                <h2 className="text-sm font-bold opacity-50">Transcript</h2>
                 <div className="flex items-center gap-2">
                   {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
                   <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
@@ -478,8 +701,7 @@ function HomeContent() {
                   </button>
                 </div>
                 {isLangMenuOpen && (
-                  <div className="absolute right-0 top-8 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                    <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
+                  <div className="absolute right-4 top-12 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
                     <div className="space-y-1">
                       {SUPPORTED_LANGUAGES.map(lang => (
                         <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
@@ -490,87 +712,22 @@ function HomeContent() {
                   </div>
                 )}
               </div>
-
-              <div className="space-y-3">
-                {isSubtitleLoading ? (
-                  <div className="text-center py-10 text-gray-500 animate-pulse">字幕データを取得中...</div>
-                ) : subtitles.length > 0 ? (
-                  subtitles.map((sub, i) => (
-                    <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
-                      <div className="mb-1">{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
-                      {showTranslation && sub.translation && (<div className="mt-1 text-sm text-blue-600 font-bold">{sub.translation}</div>)}
-                      {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-base text-gray-500 mt-2 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-2">{lang.toUpperCase()}</span>{sub.translations[lang]}</div>) : null))}
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center py-10 opacity-60">
-                    <p className="mb-2 font-bold">字幕データがありません</p>
-                    <p className="text-xs">この動画には字幕がないか、取得に失敗しました。</p>
-                  </div>
-                )}
+              <div className="flex-1 overflow-y-auto p-4">
+                <TranscriptList
+                  isSubtitleLoading={isSubtitleLoading}
+                  subtitles={subtitles}
+                  isPro={isPro}
+                  manualTargetText={manualTargetText}
+                  setManualTargetText={setManualTargetText}
+                  handleSeek={handleSeek}
+                  handleWordClick={handleWordClick}
+                  showTranslation={showTranslation}
+                  selectedLangs={selectedLangs}
+                />
               </div>
             </div>
-            <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
-            <CommentSection videoId={videoId} />
           </div>
-        </div>
-
-        {/* PCビュー */}
-        <div className="hidden md:flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
-          <div className="flex-1 overflow-y-auto space-y-6 pr-2">
-            {!isKids && userId && <Heatmap userId={userId} />}
-            <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl bg-black ${isAudioOnly ? 'h-12' : ''}`}>
-              {!isAudioOnly && <YouTube videoId={videoId} onReady={onReady} opts={{ width: '100%', height: '100%' }} className="absolute top-0 left-0 w-full h-full" />}
-            </div>
-            <button onClick={() => setIsAudioOnly(!isAudioOnly)} className="w-full py-2 bg-gray-200 text-sm font-bold rounded">Switch to Audio Only</button>
-            <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
-              <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
-            </div>
-            <CommentSection videoId={videoId} />
-          </div>
-
-          <div className={`w-1/3 rounded-lg shadow-lg border h-full flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-            <div className="p-4 border-b flex justify-between items-center relative">
-              <h2 className="text-sm font-bold opacity-50">Transcript</h2>
-              <div className="flex items-center gap-2">
-                {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
-                <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                  🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
-                </button>
-              </div>
-              {isLangMenuOpen && (
-                <div className="absolute right-4 top-12 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                  <p className="text-xs text-gray-400 mb-2 font-bold">最大3つまで選択可能</p>
-                  <div className="space-y-1">
-                    {SUPPORTED_LANGUAGES.map(lang => (
-                      <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
-                        <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="flex-1 overflow-y-auto p-4 space-y-2">
-              {/* 字幕リスト (PC) */}
-              {isSubtitleLoading ? (
-                <div className="text-center py-10 text-gray-500 animate-pulse">字幕データを取得中...</div>
-              ) : subtitles.length > 0 ? (
-                subtitles.map((sub, i) => (
-                  <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-lg leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
-                    <div>{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
-                    {showTranslation && sub.translation && (<div className="mt-2 text-base text-blue-600 font-bold">{sub.translation}</div>)}
-                    {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-base text-gray-500 mt-2 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-2">{lang.toUpperCase()}</span>{sub.translations[lang]}</div>) : null))}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-10 opacity-60">
-                  <p className="mb-2 font-bold">字幕データがありません</p>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {selectedWord && (
@@ -587,27 +744,42 @@ function HomeContent() {
                   )}
                 </p>
                 <p className="text-xl font-bold">{dictData.translation}</p>
-
-                {/* 安全チェック強化 */}
                 {dictData.sourceLang === 'English' && dictData.meanings && dictData.meanings.length > 0 && dictData.meanings[0].definitions && dictData.meanings[0].definitions.length > 0 && (
                   <div className="border-t pt-2 mt-2">
                     <p className="text-xs font-bold text-gray-400">English Definition:</p>
                     <p className="text-sm opacity-80">{dictData.meanings[0].definitions[0].definition}</p>
                   </div>
                 )}
-
                 <button onClick={handleSaveWord} disabled={isSaving} className={`w-full py-3 rounded-lg font-bold shadow-lg ${isSaving ? 'bg-gray-500' : 'bg-green-600 text-white'}`}>{isSaving ? 'Saving...' : '＋ Save'}</button>
               </div>
             ) : <p>No data</p>}
           </div>
         </>
       )}
-      {isSearchOpen && <InternalVideoSearchModal onClose={() => setIsSearchOpen(false)} onSelect={(id: string) => { setVideoId(id); setIsSearchOpen(false); setTimeout(() => loadVideo(id), 100); }} currentSubject={userProfile.learning_target} />}
+
+      {isSearchOpen && (
+        <InternalVideoSearchModal
+          onClose={() => setIsSearchOpen(false)}
+          currentSubject={userProfile.learning_target}
+          onSelect={(id: string) => {
+            setVideoId(id);
+            setIsSearchOpen(false);
+            // URLパラメータの更新と読み込みは useEffect に任せる
+            router.push(`/?videoId=${id}`);
+          }}
+        />
+      )}
 
       {userId && <AIChatButton userId={userId} />}
+
+      <div className={`shrink-0 w-full p-4 border-t text-center text-xs text-gray-400 ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+        <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Information Student</a>.</p>
+      </div>
     </main>
   );
 }
+
+
 
 export default function Home() {
   return (

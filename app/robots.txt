@@ -1,0 +1,15 @@
+import { MetadataRoute } from 'next';
+
+export default function robots(): MetadataRoute.Robots {
+  const baseUrl = 'https://vercel.com/nakis-projects-d1ae2531/my-language-dojo-l8cl'; // ★本番ドメインに書き換えてください
+
+  return {
+    rules: {
+      userAgent: '*',
+      allow: '/',
+      disallow: ['/admin/', '/api/'], // 管理画面とAPIは検索させない
+    },
+    sitemap: `${baseUrl}/sitemap.xml`,
+  };
+}
+

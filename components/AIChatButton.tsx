@@ -1,177 +1,158 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { MessageCircle, Send, X, Minimize2, Maximize2, PlayCircle, BookOpen } from 'lucide-react';
 import Link from 'next/link';
-
-type Video = {
-    id: string;
-    title: string;
-    thumbnail: string;
-};
 
 type Message = {
     role: 'user' | 'ai';
     text: string;
-    videos?: Video[]; // おすすめ動画リスト
+    videos?: { id: string; title: string; thumbnail: string }[];
+    drills?: { id: number; title: string; category: string }[]; // ★追加: ドリル提案用
 };
 
-type Props = {
-    userId: string;
-};
-
-export default function AIChatButton({ userId }: Props) {
+export default function AIChatButton({ userId }: { userId: string }) {
     const [isOpen, setIsOpen] = useState(false);
-    const [input, setInput] = useState('');
+    const [isMinimized, setIsMinimized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
-        { role: 'ai', text: 'こんにちは！レベルに合わせた動画をおすすめしますよ。' }
+        { role: 'ai', text: 'こんにちは！Dojo Masterです。学習の相談や、おすすめの動画・ドリルを聞いてください！' }
     ]);
-    const [isTyping, setIsTyping] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
+    const [input, setInput] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
 
-    // 自動スクロール
     useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isOpen]);
 
-    const handleSend = async (e?: React.FormEvent, overrideInput?: string) => {
+    const handleSend = async (e?: React.FormEvent) => {
         e?.preventDefault();
-        const userMsg = overrideInput || input;
-        if (!userMsg.trim()) return;
+        if (!input.trim() || isLoading) return;
 
+        const userMsg: Message = { role: 'user', text: input };
+        setMessages(prev => [...prev, userMsg]);
         setInput('');
-        setMessages(prev => [...prev, { role: 'user', text: userMsg }]);
-        setIsTyping(true);
+        setIsLoading(true);
 
         try {
             const res = await fetch('/api/ai/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMsg, userId }),
+                body: JSON.stringify({ message: userMsg.text, userId }),
             });
+
             const data = await res.json();
 
-            setMessages(prev => [
-                ...prev,
-                {
-                    role: 'ai',
-                    text: data.reply,
-                    videos: data.videos // 動画データがあればセット
-                }
-            ]);
+            const aiMsg: Message = {
+                role: 'ai',
+                text: data.reply,
+                videos: data.videos, // 動画提案
+                drills: data.drills  // ★ドリル提案
+            };
+            setMessages(prev => [...prev, aiMsg]);
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'ai', text: '通信エラーが発生しました。' }]);
+            setMessages(prev => [...prev, { role: 'ai', text: 'すみません、エラーが発生しました。' }]);
         } finally {
-            setIsTyping(false);
+            setIsLoading(false);
         }
     };
 
+    // 動画再生ページへ遷移 (またはロード)
+    const handleVideoSelect = (videoId: string) => {
+        // 現在のページがトップページならリロードなしで切り替えたいが、
+        // 汎用性を考えてリンク遷移にする
+        window.location.href = `/?videoId=${videoId}`;
+    };
+
+    if (!isOpen) {
+        return (
+            <button
+                onClick={() => setIsOpen(true)}
+                className="fixed bottom-6 right-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-transform z-50 flex items-center gap-2 animate-bounce-in"
+            >
+                <MessageCircle size={28} />
+                <span className="font-bold hidden md:inline">AI Chat</span>
+            </button>
+        );
+    }
+
     return (
-        <>
-            {/* チャットウィンドウ */}
-            {isOpen && (
-                <div className="fixed bottom-20 right-4 w-80 md:w-96 bg-white rounded-2xl shadow-2xl border border-gray-200 z-[60] flex flex-col overflow-hidden animate-slide-up max-h-[60vh]">
-                    {/* ヘッダー */}
-                    <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 flex justify-between items-center text-white">
-                        <div className="flex items-center gap-2">
-                            <span className="text-2xl">🤖</span>
-                            <div>
-                                <h3 className="font-bold text-sm">AI Concierge</h3>
-                                <p className="text-[10px] opacity-80">Powered by Gemini 2.5</p>
-                            </div>
-                        </div>
-                        <button onClick={() => setIsOpen(false)} className="text-white hover:bg-white/20 rounded-full p-1">
-                            ▼
-                        </button>
-                    </div>
+        <div className={`fixed bottom-6 right-6 bg-white rounded-2xl shadow-2xl z-50 flex flex-col border border-gray-200 overflow-hidden transition-all duration-300 ${isMinimized ? 'w-72 h-16' : 'w-[90vw] md:w-96 h-[600px] max-h-[80vh]'}`}>
+            {/* ヘッダー */}
+            <div className="bg-indigo-600 p-4 flex justify-between items-center text-white shrink-0 cursor-pointer" onClick={() => setIsMinimized(!isMinimized)}>
+                <div className="flex items-center gap-2 font-bold">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                    AI Dojo Master
+                </div>
+                <div className="flex gap-3">
+                    {isMinimized ? <Maximize2 size={18} /> : <Minimize2 size={18} />}
+                    <button onClick={(e) => { e.stopPropagation(); setIsOpen(false); }}><X size={20} /></button>
+                </div>
+            </div>
 
-                    {/* メッセージエリア */}
-                    <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-                        {messages.map((msg, i) => (
-                            <div key={i} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-
-                                {/* テキスト吹き出し */}
-                                <div
-                                    className={`max-w-[85%] p-3 rounded-xl text-sm leading-relaxed shadow-sm mb-1
-                    ${msg.role === 'user'
-                                            ? 'bg-blue-600 text-white rounded-tr-none'
-                                            : 'bg-white text-gray-800 border border-gray-200 rounded-tl-none'}
-                  `}
-                                >
-                                    {msg.text}
+            {/* チャットエリア (最小化時は非表示) */}
+            {!isMinimized && (
+                <>
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+                        {messages.map((m, i) => (
+                            <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                <div className={`p-3 rounded-2xl text-sm max-w-[85%] leading-relaxed shadow-sm whitespace-pre-wrap ${m.role === 'user' ? 'bg-indigo-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-200 rounded-bl-none'}`}>
+                                    {m.text}
                                 </div>
 
-                                {/* ★動画カード表示エリア (AIからの提案がある場合のみ)★ */}
-                                {msg.videos && msg.videos.length > 0 && (
-                                    <div className="flex flex-col gap-2 mt-2 w-full max-w-[90%]">
-                                        <p className="text-xs text-gray-500 font-bold ml-1">おすすめ動画:</p>
-                                        {msg.videos.map((video) => (
-                                            <Link
-                                                key={video.id}
-                                                href={`/?videoId=${video.id}`}
-                                                onClick={() => setIsOpen(false)} // クリックしたらチャットを閉じる
-                                                className="flex gap-3 bg-white p-2 rounded-lg border border-gray-200 shadow-sm hover:shadow-md hover:border-blue-400 transition group"
-                                            >
-                                                <img src={video.thumbnail} alt="thumb" className="w-20 h-12 object-cover rounded bg-gray-200 shrink-0" />
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="text-xs font-bold text-gray-800 line-clamp-2 group-hover:text-blue-600">{video.title}</p>
-                                                    <p className="text-[10px] text-blue-500 mt-1">▶ 今すぐ再生</p>
+                                {/* 動画の提案 */}
+                                {m.videos && m.videos.length > 0 && (
+                                    <div className="mt-2 flex gap-2 overflow-x-auto w-full pb-2 scrollbar-hide">
+                                        {m.videos.map(v => (
+                                            <div key={v.id} onClick={() => handleVideoSelect(v.id)} className="min-w-[140px] bg-white rounded-lg border border-gray-200 overflow-hidden cursor-pointer hover:shadow-md transition flex-shrink-0 group">
+                                                <div className="relative aspect-video">
+                                                    <img src={v.thumbnail} alt="" className="w-full h-full object-cover" />
+                                                    <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+                                                        <PlayCircle className="text-white" />
+                                                    </div>
                                                 </div>
+                                                <p className="p-2 text-xs font-bold text-gray-700 line-clamp-2">{v.title}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
+                                {/* ★追加: ドリルの提案 */}
+                                {m.drills && m.drills.length > 0 && (
+                                    <div className="mt-2 flex flex-col gap-2 w-full">
+                                        <p className="text-xs font-bold text-gray-400 ml-1">おすすめドリル:</p>
+                                        {m.drills.map(d => (
+                                            <Link key={d.id} href={`/drill/exam/${d.id}`} className="block bg-white border border-l-4 border-l-pink-500 border-gray-200 p-3 rounded shadow-sm hover:bg-gray-50 transition flex items-center justify-between group">
+                                                <div>
+                                                    <p className="font-bold text-sm text-gray-800 group-hover:text-pink-600">{d.title}</p>
+                                                    <span className="text-[10px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded">{d.category}</span>
+                                                </div>
+                                                <BookOpen size={16} className="text-gray-300 group-hover:text-pink-500" />
                                             </Link>
                                         ))}
                                     </div>
                                 )}
                             </div>
                         ))}
-
-                        {isTyping && (
-                            <div className="flex justify-start">
-                                <div className="bg-white border border-gray-200 p-3 rounded-xl rounded-tl-none text-xs text-gray-400 flex items-center gap-1">
-                                    <span>Thinking</span>
-                                    <span className="animate-bounce">.</span>
-                                    <span className="animate-bounce delay-100">.</span>
-                                    <span className="animate-bounce delay-200">.</span>
-                                </div>
-                            </div>
-                        )}
+                        {isLoading && <div className="text-xs text-gray-400 ml-2 animate-pulse">Thinking...</div>}
+                        <div ref={chatEndRef} />
                     </div>
 
-                    {/* 入力エリア */}
-                    <form onSubmit={(e) => handleSend(e)} className="p-3 bg-white border-t flex gap-2">
+                    <form onSubmit={handleSend} className="p-3 bg-white border-t border-gray-200 flex gap-2">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            placeholder="例: 初心者向けの動画は？"
-                            className="flex-1 border rounded-full px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-black"
+                            placeholder="Ask anything..."
+                            className="flex-1 bg-gray-100 border-none rounded-full px-4 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none text-black"
                         />
-                        <button
-                            type="submit"
-                            disabled={!input || isTyping}
-                            className="bg-blue-600 text-white w-10 h-10 rounded-full flex items-center justify-center hover:bg-blue-700 disabled:bg-gray-300 transition"
-                        >
-                            ➤
+                        <button type="submit" disabled={!input || isLoading} className="bg-indigo-600 text-white p-2 rounded-full disabled:opacity-50 hover:bg-indigo-500 transition">
+                            <Send size={18} />
                         </button>
                     </form>
-
-                    {/* クイックアクション */}
-                    <div className="bg-gray-100 p-2 flex gap-2 overflow-x-auto scrollbar-hide">
-                        <button onClick={() => handleSend(undefined, 'おすすめの動画を教えて！')} className="whitespace-nowrap text-xs bg-white border px-3 py-1.5 rounded-full text-gray-600 hover:bg-blue-50 font-bold">📺 おすすめ動画</button>
-                        <button onClick={() => handleSend(undefined, 'ビジネス英語の動画ある？')} className="whitespace-nowrap text-xs bg-white border px-3 py-1.5 rounded-full text-gray-600 hover:bg-blue-50 font-bold">💼 ビジネス</button>
-                        <button onClick={() => handleSend(undefined, '面白いTEDトークは？')} className="whitespace-nowrap text-xs bg-white border px-3 py-1.5 rounded-full text-gray-600 hover:bg-blue-50 font-bold">🎤 TED</button>
-                    </div>
-                </div>
+                </>
             )}
-
-            {/* 起動ボタン (FAB) */}
-            <button
-                onClick={() => setIsOpen(!isOpen)}
-                className="fixed bottom-4 right-4 w-14 h-14 bg-gradient-to-br from-blue-500 to-indigo-600 text-white rounded-full shadow-2xl flex items-center justify-center text-3xl hover:scale-110 transition z-50 border-2 border-white"
-            >
-                {isOpen ? '×' : '🤖'}
-            </button>
-        </>
+        </div>
     );
 }
 

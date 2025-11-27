@@ -61,11 +61,11 @@ export async function GET(request: Request) {
     if (!videoId) return NextResponse.json({ error: 'Video ID required' }, { status: 400 });
 
     // デモ動画特例
-    if (FALLBACK_TRANSCRIPTS[videoId]) {
-        console.log(`[API] Demo video detected (${videoId}). Returning static data.`);
-        const staticData = FALLBACK_TRANSCRIPTS[videoId].map(l => ({ ...l, translation: "" }));
-        return NextResponse.json(staticData);
-    }
+    //if (FALLBACK_TRANSCRIPTS[videoId]) {
+    //    console.log(`[API] Demo video detected (${videoId}). Returning static data.`);
+    //    const staticData = FALLBACK_TRANSCRIPTS[videoId].map(l => ({ ...l, translation: "" }));
+    //    return NextResponse.json(staticData);
+    //}
 
     try {
         // 1. キャッシュ確認
