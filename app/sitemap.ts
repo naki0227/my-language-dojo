@@ -1,7 +1,7 @@
 import { MetadataRoute } from 'next';
 
 export default function sitemap(): MetadataRoute.Sitemap {
-    const baseUrl = 'https://vercel.com/nakis-projects-d1ae2531/my-language-dojo-l8cl'; // ★本番ドメインに書き換えてください
+    const baseUrl = 'https://my-language-dojo-l8cl.vercel.app'; // ★本番ドメインに書き換えてください
 
     return [
         {
