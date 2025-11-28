@@ -82,6 +82,16 @@ export default function AdminPage() {
     const [readingTopic, setReadingTopic] = useState('');
     const [readingCategory, setReadingCategory] = useState('novel');
     const [readingLevel, setReadingLevel] = useState('B1');
+    const [isReadingBulk, setIsReadingBulk] = useState(false);
+    const [readingBulkCount, setReadingBulkCount] = useState(5);
+    const [readingTarget, setReadingTarget] = useState<'single' | 'all'>('single');
+    const [readingLogs, setReadingLogs] = useState<string[]>([]);
+
+    // Test Factory
+    const [testLevel, setTestLevel] = useState('B1');
+    const [testCount, setTestCount] = useState(20);
+    const [testTarget, setTestTarget] = useState<'single' | 'all'>('single');
+    const [testLogs, setTestLogs] = useState<string[]>([]);
 
     // Common
     const [isGenerating, setIsGenerating] = useState(false);
@@ -408,6 +418,77 @@ export default function AdminPage() {
         } catch (e: any) { alert('エラー: ' + e.message); } finally { setIsGenerating(false); }
     };
 
+    const runBulkReadingGenerator = async () => {
+        const subjects = readingTarget === 'all' ? SETUP_SUBJECTS : [currentAdminSubject];
+        const totalTasks = subjects.length * readingBulkCount;
+
+        if (!confirm(`${totalTasks} articles will be generated across ${subjects.length} languages. Continue?`)) return;
+        setIsGenerating(true);
+        setReadingLogs([]);
+
+        let completed = 0;
+
+        for (const sub of subjects) {
+            for (let i = 0; i < readingBulkCount; i++) {
+                setReadingLogs(prev => [`⏳ [${sub}] Generating (${i + 1}/${readingBulkCount})...`, ...prev]);
+                try {
+                    const res = await fetch('/api/ai/reading', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subject: sub, level: readingLevel, category: readingCategory, topic: '' }) // Bulk uses auto-topic
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    setReadingLogs(prev => [`✅ [${sub}] Created: ${data.title}`, ...prev]);
+                } catch (e: any) {
+                    setReadingLogs(prev => [`❌ [${sub}] Error: ${e.message}`, ...prev]);
+                }
+                completed++;
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        setIsGenerating(false);
+        alert('Bulk reading generation complete!');
+    };
+
+    const runTestGenerator = async () => {
+        const subjects = testTarget === 'all' ? SETUP_SUBJECTS : [currentAdminSubject];
+        const totalQuestions = subjects.length * testCount;
+
+        if (!confirm(`Generate ${totalQuestions} questions across ${subjects.length} languages (${testLevel})?`)) return;
+        setIsGenerating(true);
+        setTestLogs([]);
+
+        // Batch size of 20
+        const batchSize = 20;
+        let totalCreated = 0;
+
+        for (const sub of subjects) {
+            const batches = Math.ceil(testCount / batchSize);
+            for (let i = 0; i < batches; i++) {
+                const currentBatchSize = Math.min(batchSize, testCount - (i * batchSize));
+                setTestLogs(prev => [`⏳ [${sub}] Batch ${i + 1}/${batches}: Generating ${currentBatchSize} questions...`, ...prev]);
+
+                try {
+                    const res = await fetch('/api/admin/generate_questions', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ subject: sub, level: testLevel, count: currentBatchSize })
+                    });
+                    const data = await res.json();
+                    if (data.error) throw new Error(data.error);
+                    totalCreated += data.count;
+                    setTestLogs(prev => [`✅ [${sub}] Batch ${i + 1} Success: +${data.count} questions saved.`, ...prev]);
+                } catch (e: any) {
+                    setTestLogs(prev => [`❌ [${sub}] Batch ${i + 1} Error: ${e.message}`, ...prev]);
+                }
+                await new Promise(r => setTimeout(r, 2000));
+            }
+        }
+        setIsGenerating(false);
+        alert(`Finished! Total ${totalCreated} questions generated.`);
+    };
+
     const runSetupStep = async (step: number) => {
         setIsGenerating(true);
         try {
@@ -546,14 +627,45 @@ export default function AdminPage() {
                         <h2 className="font-bold text-2xl text-pink-400 mb-4 flex items-center gap-2"><Factory /> Content Factory (Mass Production)</h2>
 
                         <div className="grid md:grid-cols-2 gap-8">
-                            <div className="space-y-4">
+                            {/* Existing Factory (Textbook/Wordbook) */}
+                            <div className="space-y-4 border-b md:border-b-0 md:border-r border-gray-700 pb-6 md:pb-0 md:pr-6">
+                                <h3 className="text-lg font-bold text-white mb-4">📚 Textbooks & Drills</h3>
                                 <div><p className="text-sm font-bold text-gray-400 mb-2">1. ターゲット言語</p><div className="flex gap-4"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={factoryTarget === 'single'} onChange={() => setFactoryTarget('single')} className="accent-pink-500" /><span className="font-bold">{currentAdminSubject} のみ</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={factoryTarget === 'all'} onChange={() => setFactoryTarget('all')} className="accent-pink-500" /><span className="font-bold text-yellow-400">全言語一括</span></label></div></div>
                                 <div><p className="text-sm font-bold text-gray-400 mb-2">2. コンテンツタイプ</p><div className="flex flex-wrap gap-2"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'wordbook'} onChange={() => { setFactoryContentType('wordbook'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">📚 単語帳</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'drill'} onChange={() => { setFactoryContentType('drill'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">✍️ ドリル</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'textbook'} onChange={() => { setFactoryContentType('textbook'); setFactoryCount(1); }} className="accent-pink-500" /><span className="font-bold">📖 教科書</span></label></div></div>
                                 <div><p className="text-sm font-bold text-gray-400 mb-2">3. 生成数 (各レベルごと)</p><div className="flex items-center gap-4"><input type="range" min="1" max={factoryContentType === 'textbook' ? 3 : 100} value={factoryCount} onChange={(e) => setFactoryCount(parseInt(e.target.value))} className="flex-1 accent-pink-500" /><span className="text-xl font-bold text-white w-12 text-center">{factoryCount}</span></div></div>
                                 <button onClick={runContentFactory} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mt-6 flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-600' : 'bg-pink-600 hover:bg-pink-500 text-white'}`}>{isGenerating ? <><RotateCw className="animate-spin" /> Manufacturing...</> : '🏭 Start Production'}</button>
+
+                                <div className="bg-black rounded-xl p-4 h-40 overflow-y-auto border border-gray-700 font-mono text-xs flex flex-col mt-4"><div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2"><span className="text-gray-400">Log</span><span className="text-pink-400 font-bold">{factoryProgress}%</span></div><div className="flex-1 overflow-y-auto space-y-1">{factoryLogs.map((log, i) => <div key={i} className={`truncate ${log.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>{log}</div>)}</div></div>
                             </div>
 
-                            <div className="bg-black rounded-xl p-4 h-80 overflow-y-auto border border-gray-700 font-mono text-xs flex flex-col"><div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2"><span className="text-gray-400">Production Log</span><span className="text-pink-400 font-bold">{factoryProgress}%</span></div><div className="flex-1 overflow-y-auto space-y-1">{factoryLogs.map((log, i) => <div key={i} className={`truncate ${log.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>{log}</div>)}</div></div>
+                            {/* New: Proficiency Test Factory */}
+                            <div className="space-y-4">
+                                <h3 className="text-lg font-bold text-white mb-4">🧩 Proficiency Tests</h3>
+                                <div><p className="text-sm font-bold text-gray-400 mb-2">Target Language</p><div className="flex gap-4"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={testTarget === 'single'} onChange={() => setTestTarget('single')} className="accent-purple-500" /><span className="font-bold">{currentAdminSubject} のみ</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={testTarget === 'all'} onChange={() => setTestTarget('all')} className="accent-purple-500" /><span className="font-bold text-yellow-400">全言語一括</span></label></div></div>
+                                <div>
+                                    <p className="text-sm font-bold text-gray-400 mb-2">Target Level</p>
+                                    <select value={testLevel} onChange={(e) => setTestLevel(e.target.value)} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none">
+                                        {CEFR_LEVELS_SHORT.map(l => <option key={l} value={l}>{l}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <p className="text-sm font-bold text-gray-400 mb-2">Question Count (Per Language)</p>
+                                    <div className="flex items-center gap-4">
+                                        <input type="range" min="10" max="100" step="10" value={testCount} onChange={(e) => setTestCount(parseInt(e.target.value))} className="flex-1 accent-pink-500" />
+                                        <span className="text-xl font-bold text-white w-12 text-center">{testCount}</span>
+                                    </div>
+                                </div>
+                                <button onClick={runTestGenerator} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mt-6 flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-600' : 'bg-purple-600 hover:bg-purple-500 text-white'}`}>
+                                    {isGenerating ? <><RotateCw className="animate-spin" /> Generating...</> : '🧩 Generate Questions'}
+                                </button>
+
+                                <div className="bg-black rounded-xl p-4 h-40 overflow-y-auto border border-gray-700 font-mono text-xs flex flex-col mt-4">
+                                    <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2"><span className="text-gray-400">Test Gen Log</span></div>
+                                    <div className="flex-1 overflow-y-auto space-y-1">
+                                        {testLogs.map((log, i) => <div key={i} className={`truncate ${log.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>{log}</div>)}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -591,10 +703,39 @@ export default function AdminPage() {
                     <div className="bg-gray-800 p-8 rounded-xl border border-indigo-500 space-y-6 animate-fade-in max-w-2xl mx-auto">
                         <h2 className="font-bold text-2xl text-indigo-400 mb-4 flex items-center gap-2"><Book /> Reading Content Generator</h2>
                         <div className="space-y-4">
+                            <div className="flex justify-between items-center bg-gray-900 p-3 rounded-lg border border-gray-700">
+                                <span className="font-bold text-gray-300">Bulk Mode</span>
+                                <label className="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" checked={isReadingBulk} onChange={(e) => setIsReadingBulk(e.target.checked)} className="sr-only peer" />
+                                    <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                                </label>
+                            </div>
+
                             <div className="flex gap-4"><label className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={readingCategory === 'novel'} onChange={() => setReadingCategory('novel')} className="accent-indigo-500" /> Novel</label><label className="flex items-center gap-2 cursor-pointer"><input type="radio" checked={readingCategory === 'essay'} onChange={() => setReadingCategory('essay')} className="accent-indigo-500" /> Essay</label></div>
                             <select value={readingLevel} onChange={(e) => setReadingLevel(e.target.value)} className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none">{CEFR_LEVELS_SHORT.map(l => <option key={l} value={l}>{l}</option>)}</select>
-                            <input type="text" value={readingTopic} onChange={(e) => setReadingTopic(e.target.value)} placeholder="Topic (Optional)" className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none" />
-                            <button onClick={handleGenerateReading} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50`}>{isGenerating ? <RotateCw className="animate-spin" /> : '🚀 Generate Reading Material'}</button>
+
+                            {!isReadingBulk ? (
+                                <>
+                                    <input type="text" value={readingTopic} onChange={(e) => setReadingTopic(e.target.value)} placeholder="Topic (Optional)" className="w-full p-3 rounded-lg bg-gray-900 border border-gray-600 outline-none" />
+                                    <button onClick={handleGenerateReading} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50`}>{isGenerating ? <RotateCw className="animate-spin" /> : '🚀 Generate Reading Material'}</button>
+                                </>
+                            ) : (
+                                <>
+                                    <div><p className="text-sm font-bold text-gray-400 mb-2">Target Language</p><div className="flex gap-4"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={readingTarget === 'single'} onChange={() => setReadingTarget('single')} className="accent-indigo-500" /><span className="font-bold">{currentAdminSubject} のみ</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={readingTarget === 'all'} onChange={() => setReadingTarget('all')} className="accent-indigo-500" /><span className="font-bold text-yellow-400">全言語一括</span></label></div></div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="text-sm font-bold text-gray-400">Count (Per Lang):</span>
+                                        <input type="range" min="1" max="20" value={readingBulkCount} onChange={(e) => setReadingBulkCount(parseInt(e.target.value))} className="flex-1 accent-indigo-500" />
+                                        <span className="text-xl font-bold text-white w-12 text-center">{readingBulkCount}</span>
+                                    </div>
+                                    <button onClick={runBulkReadingGenerator} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50`}>{isGenerating ? <RotateCw className="animate-spin" /> : '🚀 Start Bulk Generation'}</button>
+                                    <div className="bg-black rounded-xl p-4 h-40 overflow-y-auto border border-gray-700 font-mono text-xs flex flex-col mt-4">
+                                        <div className="flex justify-between items-center mb-2 border-b border-gray-800 pb-2"><span className="text-gray-400">Bulk Log</span></div>
+                                        <div className="flex-1 overflow-y-auto space-y-1">
+                                            {readingLogs.map((log, i) => <div key={i} className={`truncate ${log.includes('Error') ? 'text-red-400' : 'text-green-400'}`}>{log}</div>)}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                     </div>
                 )}
