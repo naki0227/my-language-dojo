@@ -81,31 +81,43 @@ export async function GET(request: Request) {
             );
         }
 
-        // 2. 字幕取得 (YouTubeへアクセス)
+        // 2. 字幕取得 (YouTubeへアクセス) または DBから取得
         let rawLines: any[] = [];
+        let useMasterData = false;
 
-        try {
-            // Plan A: youtube-transcript
-            const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-            // @ts-ignore
-            rawLines = transcript.map((t: any) => ({ text: t.text, offset: Math.floor(t.offset), duration: Math.floor(t.duration) }));
-        } catch (errA) {
+        // まずDBのマスターデータを確認
+        const { data: masterData } = await adminSupabase.from('optimized_transcripts').select('content').eq('video_id', videoId).single();
+        if (masterData && masterData.content && masterData.content.length > 0) {
+            console.log('[API] Using cached master transcript for translation.');
+            rawLines = masterData.content;
+            useMasterData = true;
+        }
+
+        // DBになければYouTubeから取得
+        if (rawLines.length === 0) {
             try {
-                // Plan B: youtubei.js
-                const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
-                const info = await youtube.getInfo(videoId);
-                const transcriptData = await info.getTranscript();
-                if (transcriptData?.transcript?.content?.body?.initial_segments) {
-                    // @ts-ignore
-                    rawLines = transcriptData.transcript.content.body.initial_segments.map((segment: any) => ({
-                        text: segment.snippet.text,
-                        offset: parseInt(segment.start_ms),
-                        duration: parseInt(segment.end_ms) - parseInt(segment.start_ms)
-                    }));
+                // Plan A: youtube-transcript
+                const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+                // @ts-ignore
+                rawLines = transcript.map((t: any) => ({ text: t.text, offset: Math.floor(t.offset), duration: Math.floor(t.duration) }));
+            } catch (errA) {
+                try {
+                    // Plan B: youtubei.js
+                    const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
+                    const info = await youtube.getInfo(videoId);
+                    const transcriptData = await info.getTranscript();
+                    if (transcriptData?.transcript?.content?.body?.initial_segments) {
+                        // @ts-ignore
+                        rawLines = transcriptData.transcript.content.body.initial_segments.map((segment: any) => ({
+                            text: segment.snippet.text,
+                            offset: parseInt(segment.start_ms),
+                            duration: parseInt(segment.end_ms) - parseInt(segment.start_ms)
+                        }));
+                    }
+                } catch (errB) {
+                    console.error('[API] All fetch plans failed.', errB);
+                    // 取得失敗時は、AI処理をスキップしてダミーを出すパスへ
                 }
-            } catch (errB) {
-                console.error('[API] All fetch plans failed.', errB);
-                // 取得失敗時は、AI処理をスキップしてダミーを出すパスへ
             }
         }
 
@@ -121,8 +133,8 @@ export async function GET(request: Request) {
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
         const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: "application/json" } });
 
-        // 長すぎる場合はAIスキップ
-        if (rawLines.length > 2000 && code === 'en') {
+        // 長すぎる場合はAIスキップ (英語のみの場合)
+        if (!useMasterData && rawLines.length > 2000 && code === 'en') {
             const safeData = rawLines.map(l => ({ ...l, translation: "" }));
             await adminSupabase.from('optimized_transcripts').upsert({ video_id: videoId, content: safeData });
             return NextResponse.json(safeData);
@@ -134,15 +146,28 @@ export async function GET(request: Request) {
 
         try {
             for (const chunk of chunks) {
-                const prompt = `
-              You are a professional subtitle editor.
-              1. **Combine fragmented words into natural, complete sentences.** (Most Important)
-              2. ${code === 'en' ? 'Do not translate, just return the corrected English sentences in the "text" field.' : `Translate the corrected sentences into "${targetLangName}" and put it in the "translation" field.`}
-              3. Maintain the approximate timestamp.
-              
-              Raw Input: ${JSON.stringify(chunk)}
-              Output Format (JSON Array): [ { "text": "Corrected English", "translation": "${code === 'en' ? '' : 'Translated'}", "offset": 123, "duration": 456 } ]
-            `;
+                let prompt = "";
+                if (useMasterData) {
+                    // 既に整形済みのデータを使う場合（翻訳のみ）
+                    prompt = `
+                      You are a professional translator.
+                      Translate the following English sentences into "${targetLangName}".
+                      Input: ${JSON.stringify(chunk)}
+                      Output Format (JSON Array): [ { "text": "Original English Sentence", "translation": "Translated Sentence", "offset": 123, "duration": 456 } ]
+                    `;
+                } else {
+                    // 生データから整形＋翻訳する場合
+                    prompt = `
+                      You are a professional subtitle editor.
+                      1. **Combine fragmented words into natural, complete sentences.** (Most Important)
+                      2. ${code === 'en' ? 'Do not translate, just return the corrected English sentences in the "text" field.' : `Translate the corrected sentences into "${targetLangName}" and put it in the "translation" field.`}
+                      3. Maintain the approximate timestamp.
+                      
+                      Raw Input: ${JSON.stringify(chunk)}
+                      Output Format (JSON Array): [ { "text": "Corrected English", "translation": "${code === 'en' ? '' : 'Translated'}", "offset": 123, "duration": 456 } ]
+                    `;
+                }
+
                 const result = await model.generateContent(prompt);
                 const chunkData = JSON.parse(result.response.text());
 
@@ -153,7 +178,9 @@ export async function GET(request: Request) {
             }
 
             // 5. 保存
-            await adminSupabase.from('optimized_transcripts').upsert({ video_id: videoId, content: finalFormatted });
+            if (!useMasterData) {
+                await adminSupabase.from('optimized_transcripts').upsert({ video_id: videoId, content: finalFormatted });
+            }
             if (code !== 'en') {
                 await adminSupabase.from('localized_translations').upsert({ video_id: videoId, language: code, translations: finalTranslation }, { onConflict: 'video_id, language' });
             }
