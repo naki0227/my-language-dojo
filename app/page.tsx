@@ -745,19 +745,19 @@ function HomeContent() {
                 {studyGuide ? (
                   <div className="space-y-6">
                     {/* Summary */}
-                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
-                      <h3 className="font-bold text-indigo-700 mb-2">📝 Summary</h3>
-                      <p className="text-sm text-gray-700 leading-relaxed">{studyGuide.summary}</p>
+                    <div className={`p-4 rounded-lg border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-indigo-50 border-indigo-100'}`}>
+                      <h3 className={`font-bold mb-2 ${isPro ? 'text-indigo-300' : 'text-indigo-700'}`}>📝 Summary</h3>
+                      <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuide.summary}</p>
                     </div>
 
                     {/* Key Sentences */}
                     <div>
-                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">🔑 Key Sentences</h3>
+                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🔑 Key Sentences</h3>
                       <ul className="space-y-3">
                         {studyGuide.key_sentences?.map((s: any, i: number) => (
                           <li key={i} className="text-sm">
-                            <p className="font-bold text-gray-800">{s.sentence}</p>
-                            <p className="text-gray-500 text-xs">{s.translation}</p>
+                            <p className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
+                            <p className={`text-xs ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
                             <p className="text-indigo-500 text-xs mt-1">💡 {s.explanation}</p>
                           </li>
                         ))}
@@ -766,22 +766,19 @@ function HomeContent() {
 
                     {/* Vocabulary */}
                     <div>
-                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">📚 Vocabulary</h3>
+                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📚 Vocabulary</h3>
                       <div className="grid grid-cols-1 gap-2">
                         {studyGuide.vocabulary?.map((v: any, i: number) => (
-                          <div key={i} className="bg-gray-50 p-2 rounded border text-sm flex justify-between items-center group">
+                          <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
                             <div>
-                              <span className="font-bold text-gray-800">{v.word}</span>
+                              <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
                               <span className="text-gray-500 mx-2">-</span>
-                              <span className="text-gray-600">{v.meaning}</span>
+                              <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
                             </div>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
-                                handleSaveWord(); // Re-use existing save logic (might need tweak if handleSaveWord relies on dictData state being set immediately)
-                                // Actually handleSaveWord uses state, which is async. Better to call save directly or use a helper.
-                                // Let's use a direct save here to be safe.
                                 const save = async () => {
                                   if (!userId) return;
                                   try {
@@ -802,12 +799,12 @@ function HomeContent() {
 
                     {/* Grammar */}
                     <div>
-                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">📐 Grammar</h3>
+                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📐 Grammar</h3>
                       <ul className="space-y-2">
                         {studyGuide.grammar?.map((g: any, i: number) => (
-                          <li key={i} className="text-sm bg-yellow-50 p-2 rounded border border-yellow-100">
-                            <span className="font-bold text-yellow-800 block">{g.point}</span>
-                            <span className="text-gray-600">{g.explanation}</span>
+                          <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
+                            <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
+                            <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
                           </li>
                         ))}
                       </ul>
@@ -815,14 +812,14 @@ function HomeContent() {
 
                     {/* Quiz */}
                     <div>
-                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">🧩 Comprehension Quiz</h3>
+                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🧩 Comprehension Quiz</h3>
                       <div className="space-y-4">
                         {studyGuide.quiz?.map((q: any, i: number) => (
                           <div key={i} className="text-sm">
-                            <p className="font-bold mb-1">Q{i + 1}. {q.question}</p>
+                            <p className={`font-bold mb-1 ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
                             <div className="pl-2 space-y-1">
                               {q.options?.map((opt: string, oi: number) => (
-                                <div key={oi} className="text-gray-600">
+                                <div key={oi} className={`${isPro ? 'text-gray-400' : 'text-gray-600'}`}>
                                   {opt === q.answer ? '✅' : '⚪️'} {opt}
                                 </div>
                               ))}
