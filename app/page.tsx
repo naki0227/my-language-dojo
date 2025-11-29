@@ -755,10 +755,32 @@ function HomeContent() {
                       <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">📚 Vocabulary</h3>
                       <div className="grid grid-cols-1 gap-2">
                         {studyGuide.vocabulary?.map((v: any, i: number) => (
-                          <div key={i} className="bg-gray-50 p-2 rounded border text-sm">
-                            <span className="font-bold text-gray-800">{v.word}</span>
-                            <span className="text-gray-500 mx-2">-</span>
-                            <span className="text-gray-600">{v.meaning}</span>
+                          <div key={i} className="bg-gray-50 p-2 rounded border text-sm flex justify-between items-center group">
+                            <div>
+                              <span className="font-bold text-gray-800">{v.word}</span>
+                              <span className="text-gray-500 mx-2">-</span>
+                              <span className="text-gray-600">{v.meaning}</span>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
+                                handleSaveWord(); // Re-use existing save logic (might need tweak if handleSaveWord relies on dictData state being set immediately)
+                                // Actually handleSaveWord uses state, which is async. Better to call save directly or use a helper.
+                                // Let's use a direct save here to be safe.
+                                const save = async () => {
+                                  if (!userId) return;
+                                  try {
+                                    await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
+                                    await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
+                                  } catch { alert('Save failed'); }
+                                };
+                                save();
+                              }}
+                              className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition"
+                            >
+                              ＋ Save
+                            </button>
                           </div>
                         ))}
                       </div>

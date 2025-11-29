@@ -49,7 +49,7 @@ export async function POST(request: Request) {
         }
         
         Requirements:
-        1. "key_sentences": Pick 3-5 most useful sentences.
+        1. "key_sentences": Pick 3-5 most useful sentences. The "sentence" MUST be in the Target Language (e.g. English). The "explanation" MUST be in Japanese and explain the grammar/nuance.
         2. "vocabulary": Pick 5-10 difficult/useful words.
         3. "grammar": Pick 2-3 grammar points used in the video.
         4. "quiz": Create 3 comprehension questions.
