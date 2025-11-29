@@ -207,6 +207,7 @@ function HomeContent() {
 
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
+  const [studyGuide, setStudyGuide] = useState<any>(null); // New State
   const playerRef = useRef<any | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -310,18 +311,29 @@ function HomeContent() {
     setSelectedLangs([]); setLoadedLang(null); setShowTranslation(false);
     setIsSubtitleLoading(true);
     setPlayError(false);
+    setStudyGuide(null); // Reset
 
     try {
-      const res = await fetch(`/api/transcript?videoId=${id}`);
-      const data = await res.json();
-      if (data.error) {
-        console.error(`字幕エラー: ${data.error}`);
+      // 1. Try to fetch Study Guide
+      const { data: guide } = await supabase
+        .from('video_study_guides')
+        .select('*')
+        .eq('video_id', id)
+        .single();
+
+      if (guide) {
+        setStudyGuide(guide);
       } else {
-        const items = Array.isArray(data) ? data : [];
-        const formatted = items.map((item: any) => ({ ...item, translations: {} }));
-        setSubtitles(formatted);
-        logStudyActivity();
+        // Fallback or just show empty
+        console.log("No study guide found");
       }
+
+      // 2. (Optional) Fetch subtitles if you still want them for internal logic (like word click), 
+      // but we are hiding the TranscriptList. 
+      // For now, let's NOT fetch raw transcripts to be safe, or just fetch them for the "VoiceRecorder" context if needed.
+      // The user wants to avoid "displaying" them.
+      // I will skip fetching subtitles to be 100% safe as per user request.
+
     } catch (e) { console.error('通信エラー', e); }
     finally { setIsSubtitleLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -691,39 +703,85 @@ function HomeContent() {
             </div>
 
             <div className={`w-1/3 rounded-lg shadow-lg border h-full flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-              {/* PC用字幕ヘッダー */}
+              {/* PC用ヘッダー */}
               <div className="p-4 border-b flex justify-between items-center relative">
-                <h2 className="text-sm font-bold opacity-50">Transcript</h2>
-                <div className="flex items-center gap-2">
-                  {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
-                  <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                    🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
-                  </button>
-                </div>
-                {isLangMenuOpen && (
-                  <div className="absolute right-4 top-12 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                    <div className="space-y-1">
-                      {SUPPORTED_LANGUAGES.map(lang => (
-                        <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
-                          <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <h2 className="text-sm font-bold opacity-50">Study Guide</h2>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                <TranscriptList
-                  isSubtitleLoading={isSubtitleLoading}
-                  subtitles={subtitles}
-                  isPro={isPro}
-                  manualTargetText={manualTargetText}
-                  setManualTargetText={setManualTargetText}
-                  handleSeek={handleSeek}
-                  handleWordClick={handleWordClick}
-                  showTranslation={showTranslation}
-                  selectedLangs={selectedLangs}
-                />
+                {studyGuide ? (
+                  <div className="space-y-6">
+                    {/* Summary */}
+                    <div className="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                      <h3 className="font-bold text-indigo-700 mb-2">📝 Summary</h3>
+                      <p className="text-sm text-gray-700 leading-relaxed">{studyGuide.summary}</p>
+                    </div>
+
+                    {/* Key Sentences */}
+                    <div>
+                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">🔑 Key Sentences</h3>
+                      <ul className="space-y-3">
+                        {studyGuide.key_sentences?.map((s: any, i: number) => (
+                          <li key={i} className="text-sm">
+                            <p className="font-bold text-gray-800">{s.sentence}</p>
+                            <p className="text-gray-500 text-xs">{s.translation}</p>
+                            <p className="text-indigo-500 text-xs mt-1">💡 {s.explanation}</p>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Vocabulary */}
+                    <div>
+                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">📚 Vocabulary</h3>
+                      <div className="grid grid-cols-1 gap-2">
+                        {studyGuide.vocabulary?.map((v: any, i: number) => (
+                          <div key={i} className="bg-gray-50 p-2 rounded border text-sm">
+                            <span className="font-bold text-gray-800">{v.word}</span>
+                            <span className="text-gray-500 mx-2">-</span>
+                            <span className="text-gray-600">{v.meaning}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Grammar */}
+                    <div>
+                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">📐 Grammar</h3>
+                      <ul className="space-y-2">
+                        {studyGuide.grammar?.map((g: any, i: number) => (
+                          <li key={i} className="text-sm bg-yellow-50 p-2 rounded border border-yellow-100">
+                            <span className="font-bold text-yellow-800 block">{g.point}</span>
+                            <span className="text-gray-600">{g.explanation}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    {/* Quiz */}
+                    <div>
+                      <h3 className="font-bold text-gray-700 mb-2 border-b pb-1">🧩 Comprehension Quiz</h3>
+                      <div className="space-y-4">
+                        {studyGuide.quiz?.map((q: any, i: number) => (
+                          <div key={i} className="text-sm">
+                            <p className="font-bold mb-1">Q{i + 1}. {q.question}</p>
+                            <div className="pl-2 space-y-1">
+                              {q.options?.map((opt: string, oi: number) => (
+                                <div key={oi} className="text-gray-600">
+                                  {opt === q.answer ? '✅' : '⚪️'} {opt}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-center py-10 opacity-60">
+                    <p className="mb-2 font-bold">Study Guide Not Found</p>
+                    <p className="text-xs">Please generate it in the Admin Dashboard.</p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
