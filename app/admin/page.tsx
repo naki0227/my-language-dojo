@@ -57,7 +57,7 @@ export default function AdminPage() {
 
     // Factory
     const [factoryTarget, setFactoryTarget] = useState<'all' | 'single'>('single');
-    const [factoryContentType, setFactoryContentType] = useState<'wordbook' | 'textbook' | 'drill'>('wordbook');
+    const [factoryContentType, setFactoryContentType] = useState<'wordbook' | 'textbook' | 'drill' | 'podcast' | 'all'>('wordbook');
     const [factoryCount, setFactoryCount] = useState(10);
     const [factoryLogs, setFactoryLogs] = useState<string[]>([]);
     const [factoryProgress, setFactoryProgress] = useState(0);
@@ -269,12 +269,14 @@ export default function AdminPage() {
     // 3. ファクトリー (量産)
     const runContentFactory = async () => {
         const subjects = factoryTarget === 'all' ? SETUP_SUBJECTS : [currentAdminSubject];
-        const types = [factoryContentType];
+        // 'all' type means generate EVERYTHING
+        const types = factoryContentType === 'all' ? ['wordbook', 'textbook', 'drill', 'podcast'] : [factoryContentType];
         const levels = CEFR_LEVELS_SHORT;
+
         const totalTasks = subjects.length * types.length * levels.length * factoryCount;
         let completed = 0;
 
-        if (!confirm(`合計 ${totalTasks} 個のコンテンツを生成します。\nタイプ: ${factoryContentType}\n時間がかかりますがよろしいですか？`)) return;
+        if (!confirm(`合計 ${totalTasks} 個のコンテンツを生成します。\n対象言語: ${subjects.length}言語\nタイプ: ${types.join(', ')}\nレベル: ${levels.join(', ')}\n\n時間がかかりますがよろしいですか？`)) return;
 
         setIsGenerating(true);
         setFactoryLogs([]);
@@ -295,8 +297,14 @@ export default function AdminPage() {
                                 const data = await res.json();
                                 setFactoryLogs(prev => [`✅ Created: ${data.title}`, ...prev]);
                             } else {
+                                if (res.status === 429) {
+                                    setFactoryLogs(prev => [`⚠️ Rate Limit Hit. Waiting 60s...`, ...prev]);
+                                    await new Promise(r => setTimeout(r, 60000));
+                                    i--; // Retry this iteration
+                                    continue;
+                                }
                                 const errorText = await res.text();
-                                setFactoryLogs(prev => [`❌ Error: ${label} (${errorText.substring(0, 50)}...)`, ...prev]);
+                                setFactoryLogs(prev => [`❌ Error: ${errorText}`, ...prev]);
                             }
                         } catch (e) { setFactoryLogs(prev => [`❌ Network Error: ${label}`, ...prev]); }
                         completed++;
@@ -631,7 +639,13 @@ export default function AdminPage() {
                             <div className="space-y-4 border-b md:border-b-0 md:border-r border-gray-700 pb-6 md:pb-0 md:pr-6">
                                 <h3 className="text-lg font-bold text-white mb-4">📚 Textbooks & Drills</h3>
                                 <div><p className="text-sm font-bold text-gray-400 mb-2">1. ターゲット言語</p><div className="flex gap-4"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={factoryTarget === 'single'} onChange={() => setFactoryTarget('single')} className="accent-pink-500" /><span className="font-bold">{currentAdminSubject} のみ</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1"><input type="radio" checked={factoryTarget === 'all'} onChange={() => setFactoryTarget('all')} className="accent-pink-500" /><span className="font-bold text-yellow-400">全言語一括</span></label></div></div>
-                                <div><p className="text-sm font-bold text-gray-400 mb-2">2. コンテンツタイプ</p><div className="flex flex-wrap gap-2"><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'wordbook'} onChange={() => { setFactoryContentType('wordbook'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">📚 単語帳</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'drill'} onChange={() => { setFactoryContentType('drill'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">✍️ ドリル</span></label><label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'textbook'} onChange={() => { setFactoryContentType('textbook'); setFactoryCount(1); }} className="accent-pink-500" /><span className="font-bold">📖 教科書</span></label></div></div>
+                                <div><p className="text-sm font-bold text-gray-400 mb-2">2. コンテンツタイプ</p><div className="flex flex-wrap gap-2">
+                                    <label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'wordbook'} onChange={() => { setFactoryContentType('wordbook'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">📚 単語帳</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'drill'} onChange={() => { setFactoryContentType('drill'); setFactoryCount(10); }} className="accent-pink-500" /><span className="font-bold">✍️ ドリル</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'textbook'} onChange={() => { setFactoryContentType('textbook'); setFactoryCount(1); }} className="accent-pink-500" /><span className="font-bold">📖 教科書</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'podcast'} onChange={() => { setFactoryContentType('podcast'); setFactoryCount(1); }} className="accent-pink-500" /><span className="font-bold">🎧 Podcast</span></label>
+                                    <label className="flex items-center gap-2 cursor-pointer p-3 rounded border border-gray-600 bg-gray-900 flex-1 min-w-[140px]"><input type="radio" checked={factoryContentType === 'all'} onChange={() => { setFactoryContentType('all'); setFactoryCount(1); }} className="accent-pink-500" /><span className="font-bold text-yellow-400">🔥 全部一括</span></label>
+                                </div></div>
                                 <div><p className="text-sm font-bold text-gray-400 mb-2">3. 生成数 (各レベルごと)</p><div className="flex items-center gap-4"><input type="range" min="1" max={factoryContentType === 'textbook' ? 3 : 100} value={factoryCount} onChange={(e) => setFactoryCount(parseInt(e.target.value))} className="flex-1 accent-pink-500" /><span className="text-xl font-bold text-white w-12 text-center">{factoryCount}</span></div></div>
                                 <button onClick={runContentFactory} disabled={isGenerating} className={`w-full py-4 rounded-lg font-bold text-lg shadow-lg mt-6 flex items-center justify-center gap-2 ${isGenerating ? 'bg-gray-600' : 'bg-pink-600 hover:bg-pink-500 text-white'}`}>{isGenerating ? <><RotateCw className="animate-spin" /> Manufacturing...</> : '🏭 Start Production'}</button>
 

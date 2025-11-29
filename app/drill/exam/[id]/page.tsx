@@ -38,7 +38,7 @@ export default function ExamDrill() {
         }
     };
 
-    if (questions.length === 0) return <div className="p-10 text-center">Loading questions...</div>;
+    if (questions.length === 0) return <div className="p-10 text-center text-gray-500">No questions found for this drill. (ID: {id})</div>;
 
     if (showResult) {
         return (
@@ -64,7 +64,7 @@ export default function ExamDrill() {
 
                 {/* 問題文 */}
                 <div className="bg-white p-6 rounded-xl shadow-sm mb-6 border border-gray-200">
-                    <p className="text-lg text-gray-800 font-medium whitespace-pre-wrap">{q.question}</p>
+                    <p className="text-lg text-gray-800 font-medium whitespace-pre-wrap">{q.question.replace(/\\n/g, '\n')}</p>
                 </div>
 
                 {/* 選択肢 */}
