@@ -183,49 +183,7 @@ export default function AdminPage() {
         }
     };
 
-    // --- 0. Raw Data Import (手動インポート) ---
-    const handleFormatSave = async () => {
-        if (!importVideoId || !rawJsonInput) {
-            setImportLog('Error: Video ID and JSON content are required.');
-            return;
-        }
-        setIsImporting(true);
-        setImportLog('⏳ Starting format and save...');
 
-        try {
-            let parsedJson;
-            try {
-                parsedJson = JSON.parse(rawJsonInput.trim());
-                if (!Array.isArray(parsedJson)) throw new Error('Input must be a JSON array.');
-            } catch (e: any) {
-                setImportLog('❌ JSON Parse Error: Input is not a valid JSON Array.');
-                setIsImporting(false);
-                return;
-            }
-
-            const res = await fetch('/api/transcript/format_only', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ videoId: importVideoId, rawLines: parsedJson }),
-            });
-
-            if (!res.ok) {
-                const errorBody = await res.json();
-                throw new Error(errorBody.error || `Status ${res.status}`);
-            }
-
-            const data = await res.json();
-            setImportLog(`✅ Success: ${data.count} lines formatted and saved to optimized_transcripts.`);
-            setRawJsonInput('');
-            setImportVideoId('');
-            fetchMissingVideos();
-
-        } catch (e: any) {
-            setImportLog(`❌ Fatal Error during processing: ${e.message}`);
-        } finally {
-            setIsImporting(false);
-        }
-    };
 
 
     // --- 1. 動画検索 (Finder) ---
@@ -384,6 +342,47 @@ export default function AdminPage() {
             alert(`保存しました！\n教科書: ${data.title}`);
             setTopic(''); setTitle(''); setContent('');
         } catch (e: any) { alert('保存エラー: ' + e.message); } finally { setIsSaving(false); }
+    };
+
+    // 3. 生データ整形 & 保存 (Pivot to Study Guide)
+    const handleFormatSave = async () => {
+        setIsImporting(true);
+        setImportLog('⏳ Analyzing video and generating study guide...');
+        try {
+            // Parse JSON input to get text
+            let transcriptText = '';
+            try {
+                const json = JSON.parse(rawJsonInput);
+                if (Array.isArray(json)) {
+                    transcriptText = json.map((item: any) => item.text).join(' ');
+                } else {
+                    transcriptText = rawJsonInput; // Fallback if raw text
+                }
+            } catch (e) {
+                transcriptText = rawJsonInput;
+            }
+
+            const res = await fetch('/api/admin/generate_study_guide', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    videoId: importVideoId,
+                    transcript: transcriptText,
+                    subject: currentAdminSubject
+                }),
+            });
+
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+
+            setImportLog(`✅ Study Guide Created: ${data.data.title}`);
+            setRawJsonInput('');
+            setImportVideoId('');
+        } catch (e: any) {
+            setImportLog(`❌ Error: ${e.message}`);
+        } finally {
+            setIsImporting(false);
+        }
     };
 
     const handleAiDailyPick = async () => {
