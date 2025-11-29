@@ -43,7 +43,13 @@ export async function POST(request: Request) {
             // Plan A: youtube-transcript
             console.log('[API] Trying Plan A: youtube-transcript');
             const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+            if (!transcript || transcript.length === 0) {
+                throw new Error('Plan A returned empty transcript');
+            }
             transcriptText = transcript.map((t: any) => t.text).join(' ');
+            if (!transcriptText.trim()) {
+                throw new Error('Plan A returned empty text');
+            }
             console.log('[API] Plan A Success. Length:', transcriptText.length);
         } catch (errA) {
             console.warn('[API] Plan A failed:', errA);
@@ -59,14 +65,17 @@ export async function POST(request: Request) {
                         .map((segment: any) => segment.snippet.text)
                         .join(' ');
                     console.log('[API] Plan B Success. Length:', transcriptText.length);
+                } else {
+                    console.warn('[API] Plan B found no segments');
                 }
             } catch (errB) {
                 console.error('[API] Failed to fetch transcript:', errB);
-                return NextResponse.json({ error: 'Failed to fetch transcript. Cannot generate study guide.' }, { status: 404 });
+                // Don't return here, let it fall through to the check below
             }
         }
 
         if (!transcriptText) {
+            console.error('[API] No transcript found after all attempts.');
             return NextResponse.json({ error: 'No transcript found.' }, { status: 404 });
         }
 
