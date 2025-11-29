@@ -207,6 +207,13 @@ function HomeContent() {
 
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [explanationLang, setExplanationLang] = useState('Japanese'); // Default explanation lang
+
+  // Summary Interactive State
+  const [userSummary, setUserSummary] = useState('');
+  const [summaryFeedback, setSummaryFeedback] = useState<string | null>(null);
+  const [isCheckingSummary, setIsCheckingSummary] = useState(false);
+  const [showModelSummary, setShowModelSummary] = useState(false);
+
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [studyGuide, setStudyGuide] = useState<any>(null); // New State
@@ -316,6 +323,12 @@ function HomeContent() {
     setPlayError(false);
     setStudyGuide(null); // Reset
 
+    // Reset Summary State
+    setUserSummary('');
+    setSummaryFeedback(null);
+    setIsCheckingSummary(false);
+    setShowModelSummary(false);
+
     try {
       // 1. Try to fetch Study Guide
       const { data: guide } = await supabase
@@ -413,7 +426,14 @@ function HomeContent() {
     if (!userId) return;
     try {
       await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
-      window.location.reload();
+      setUserProfile(prev => ({ ...prev, learning_target: newLang }));
+
+      // Sync Study Guide Language
+      setExplanationLang(newLang);
+      loadVideo(videoId, newLang);
+
+      // Reload to refresh other components if needed (or just state update is enough?)
+      // window.location.reload(); // Let's try to avoid reload for smoother UX
     } catch (e) { alert('設定の保存に失敗しました'); }
   };
 
@@ -577,6 +597,30 @@ function HomeContent() {
 
 
 
+  const handleCheckSummary = async () => {
+    if (!userSummary.trim()) return;
+    setIsCheckingSummary(true);
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages: [
+            { role: 'system', content: `You are a language teacher. The user has written a summary of a video. Compare it to the model answer: "${studyGuide?.summary}". Give a score (0-100) and brief feedback in ${explanationLang}.` },
+            { role: 'user', content: userSummary }
+          ]
+        })
+      });
+      const data = await res.json();
+      setSummaryFeedback(data.response);
+      setShowModelSummary(true);
+    } catch (e) {
+      alert('Evaluation failed');
+    } finally {
+      setIsCheckingSummary(false);
+    }
+  };
+
   if (!userId || !mounted) return <div className="p-10 text-center">Loading...</div>;
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
@@ -606,8 +650,21 @@ function HomeContent() {
           <h1 className={`text-xl font-bold ${isKids ? 'font-comic text-yellow-500' : ''}`}>
             {userProfile.learning_target} Dojo
           </h1>
-          <div className="scale-75 origin-left">
-            <UserStatus level={currentLevelData.level_result.split(' ')[0] || '1'} xp={currentLevelData.xp} nextLevelXp={XP_CAP} />
+          <div className="flex items-center gap-2">
+            <select
+              value={userProfile.learning_target}
+              onChange={(e) => handleTargetLanguageChange(e.target.value)}
+              className={`text-sm font-bold border-none bg-transparent cursor-pointer hover:opacity-70 transition ${isPro ? 'text-white' : 'text-gray-800'}`}
+            >
+              {SUPPORTED_LANGUAGES.map(lang => (
+                <option key={lang.code} value={lang.label.split(' ')[1] || lang.code} className="text-black">
+                  {lang.label}
+                </option>
+              ))}
+            </select>
+            <div className="scale-75 origin-left">
+              <UserStatus level={currentLevelData.level_result.split(' ')[0] || '1'} xp={currentLevelData.xp} nextLevelXp={XP_CAP} />
+            </div>
           </div>
         </div>
         <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
@@ -746,8 +803,53 @@ function HomeContent() {
                   <div className="space-y-6">
                     {/* Summary */}
                     <div className={`p-4 rounded-lg border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-indigo-50 border-indigo-100'}`}>
-                      <h3 className={`font-bold mb-2 ${isPro ? 'text-indigo-300' : 'text-indigo-700'}`}>📝 Summary</h3>
-                      <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuide.summary}</p>
+                      <h3 className={`font-bold mb-2 ${isPro ? 'text-indigo-300' : 'text-indigo-700'}`}>📝 Summary Challenge</h3>
+
+                      {!showModelSummary ? (
+                        <div className="space-y-3">
+                          <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>
+                            Watch the video and write a 3-sentence summary in {explanationLang}!
+                          </p>
+                          <textarea
+                            value={userSummary}
+                            onChange={(e) => setUserSummary(e.target.value)}
+                            className={`w-full p-3 rounded border text-sm ${isPro ? 'bg-gray-800 border-gray-600 text-white' : 'bg-white border-gray-300 text-black'}`}
+                            rows={3}
+                            placeholder="Type your summary here..."
+                          />
+                          <button
+                            onClick={handleCheckSummary}
+                            disabled={isCheckingSummary || !userSummary.trim()}
+                            className={`w-full py-2 rounded font-bold text-white transition ${isCheckingSummary ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-700'}`}
+                          >
+                            {isCheckingSummary ? 'Analyzing...' : 'Check My Summary'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4 animate-fade-in">
+                          <div className={`p-3 rounded border ${isPro ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                            <p className="text-xs font-bold opacity-50 mb-1">Your Summary</p>
+                            <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-800'}`}>{userSummary}</p>
+                          </div>
+
+                          <div className={`p-3 rounded border border-l-4 ${isPro ? 'bg-blue-900/30 border-blue-500' : 'bg-blue-50 border-blue-500'}`}>
+                            <p className="text-xs font-bold text-blue-500 mb-1">AI Feedback</p>
+                            <p className={`text-sm ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{summaryFeedback}</p>
+                          </div>
+
+                          <div className="border-t pt-3">
+                            <p className="text-xs font-bold opacity-50 mb-1">Model Answer</p>
+                            <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuide.summary}</p>
+                          </div>
+
+                          <button
+                            onClick={() => setShowModelSummary(false)}
+                            className="text-xs text-gray-500 underline hover:text-gray-700"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Key Sentences */}
