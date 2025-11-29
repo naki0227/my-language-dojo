@@ -787,15 +787,15 @@ function HomeContent() {
               <div className="p-4 border-b flex justify-between items-center relative">
                 <h2 className="text-sm font-bold opacity-50">Study Guide</h2>
                 <div className="flex gap-2">
-                  {['Japanese', 'English', 'Spanish'].map(lang => (
-                    <button
-                      key={lang}
-                      onClick={() => loadVideo(videoId, lang)}
-                      className={`text-xs px-2 py-1 rounded border ${explanationLang === lang ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                    >
-                      {lang === 'Japanese' ? '🇯🇵' : lang === 'English' ? '🇺🇸' : '🇪🇸'}
-                    </button>
-                  ))}
+                  <select
+                    value={explanationLang}
+                    onChange={(e) => loadVideo(videoId, e.target.value)}
+                    className={`text-xs font-bold border rounded px-2 py-1 cursor-pointer ${isPro ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-50 text-gray-700 border-gray-300'}`}
+                  >
+                    <option value="Japanese">🇯🇵 Japanese</option>
+                    <option value="English">🇺🇸 English</option>
+                    <option value="Spanish">🇪🇸 Spanish</option>
+                  </select>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
