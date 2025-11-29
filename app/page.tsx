@@ -36,6 +36,7 @@ type UserProfile = {
   goal: string;
   placement_test_done: boolean;
   learning_target: string;
+  study_guide_langs: string[]; // Added
 };
 
 const CEFR_LEVELS = [
@@ -192,7 +193,7 @@ function HomeContent() {
   const [userId, setUserId] = useState<string | null>(null);
   const [username, setUsername] = useState('Hero');
   const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English'
+    id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
   });
 
   const [currentLevelData, setCurrentLevelData] = useState<UserLevelData>({
@@ -446,6 +447,14 @@ function HomeContent() {
     } catch (e) { alert('レベルの保存に失敗しました'); }
   };
 
+  const handleSaveSettings = async (newTheme: 'kids' | 'student' | 'pro', newGoal: string, newLangs: string[]) => {
+    if (!userId) return;
+    try {
+      await supabase.from('profiles').update({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs }).eq('id', userId);
+      setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
+      setIsSettingsOpen(false);
+    } catch (e) { alert('設定の保存に失敗しました'); }
+  };
   const handleThemeChange = async (newTheme: any) => {
     if (!userId) return;
     await supabase.from('profiles').update({ theme: newTheme }).eq('id', userId);
@@ -672,38 +681,49 @@ function HomeContent() {
 
       {/* 設定パネル */}
       {isSettingsOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white p-6 rounded-xl max-w-sm w-full text-black shadow-2xl">
-            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg">⚙️ 設定</h3><button onClick={() => setIsSettingsOpen(false)} className="text-gray-400 text-xl">×</button></div>
-            <div className="space-y-4">
-              <div className="border p-3 rounded-lg bg-gray-50">
-                <p className="mb-2 font-bold text-sm text-indigo-600">現在のレベル ({userProfile.learning_target})</p>
-                <select value={currentLevelData.level_result} onChange={(e) => handleManualLevelChange(e.target.value)} className="w-full p-2 border rounded text-black">
-                  {CEFR_LEVELS.map(level => (<option key={level} value={level}>{level}</option>))}
-                </select>
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-xl max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Settings</h2>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-2">Theme</label>
+              <div className="flex gap-2">
+                {['kids', 'student', 'pro'].map(t => (
+                  <button key={t} onClick={() => handleSaveSettings(t as any, userProfile.goal, userProfile.study_guide_langs || [])} className={`px-3 py-1 rounded border ${userProfile.theme === t ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
+                    {t}
+                  </button>
+                ))}
               </div>
-              <div>
-                <p className="mb-1 font-bold text-sm text-gray-500">学習対象</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {SUPPORTED_LANGUAGES.map(lang => (
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-bold mb-2">Study Guide Languages (Max 3)</label>
+              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border p-2 rounded">
+                {SUPPORTED_LANGUAGES.map(lang => {
+                  const isSelected = userProfile.study_guide_langs?.includes(lang.dbName);
+                  return (
                     <button
                       key={lang.code}
-                      onClick={() => handleTargetLanguageChange(lang.label.split(' ')[1] || lang.code)}
-                      className={`py-2 rounded-lg border font-bold text-sm transition 
-                          ${userProfile.learning_target === (lang.label.split(' ')[1] || lang.code) ? 'bg-indigo-100 border-indigo-400 text-indigo-700' : 'hover:bg-gray-50'}`}
+                      onClick={() => {
+                        let newLangs = [...(userProfile.study_guide_langs || [])];
+                        if (isSelected) {
+                          newLangs = newLangs.filter(l => l !== lang.dbName);
+                        } else {
+                          if (newLangs.length >= 3) return; // Max 3
+                          newLangs.push(lang.dbName);
+                        }
+                        handleSaveSettings(userProfile.theme, userProfile.goal, newLangs);
+                      }}
+                      className={`text-xs px-2 py-1 rounded border text-left ${isSelected ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-gray-50 border-gray-200'}`}
                     >
-                      {lang.label}
+                      {isSelected ? '✅' : '⬜️'} {lang.label}
                     </button>
-                  ))}
-                  <button onClick={() => handleTargetLanguageChange('Sign Language')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Sign Language' ? 'bg-green-100 text-green-700' : 'hover:bg-gray-50'}`}>🤟 手話</button>
-                  <button onClick={() => handleTargetLanguageChange('Programming')} className={`py-2 rounded-lg border font-bold text-sm transition ${userProfile.learning_target === 'Programming' ? 'bg-red-100 text-red-700' : 'hover:bg-gray-50'}`}>💻 Code</button>
-                </div>
+                  );
+                })}
               </div>
-              <Link href="/dashboard" className="block w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white text-center py-3 rounded-lg font-bold shadow-md hover:opacity-90">🏠 ダッシュボード</Link>
-              <Link href="/dashboard/archive" className="block w-full bg-gray-100 text-gray-700 text-center py-2 rounded-lg font-bold hover:bg-gray-200 text-sm">📅 過去のピックアップ</Link>
-              <Link href="/pricing" className="block w-full bg-yellow-100 text-yellow-700 text-center py-2 rounded-lg font-bold hover:bg-yellow-200 text-sm">💎 プラン変更 (Pro)</Link>
-              <button onClick={handleLogout} className="w-full text-red-500 text-sm py-2 border rounded hover:bg-red-50">ログアウト</button>
             </div>
+
+            <button onClick={() => setIsSettingsOpen(false)} className="w-full py-2 bg-gray-200 rounded font-bold">Close</button>
           </div>
         </div>
       )}
@@ -792,9 +812,11 @@ function HomeContent() {
                     onChange={(e) => loadVideo(videoId, e.target.value)}
                     className={`text-xs font-bold border rounded px-2 py-1 cursor-pointer ${isPro ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-50 text-gray-700 border-gray-300'}`}
                   >
-                    <option value="Japanese">🇯🇵 Japanese</option>
-                    <option value="English">🇺🇸 English</option>
-                    <option value="Spanish">🇪🇸 Spanish</option>
+                    {userProfile.study_guide_langs?.map(lang => (
+                      <option key={lang} value={lang}>
+                        {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label || lang}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
