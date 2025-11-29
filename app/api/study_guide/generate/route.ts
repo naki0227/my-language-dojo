@@ -15,7 +15,10 @@ export const maxDuration = 120;
 
 export async function POST(request: Request) {
     try {
-        const { videoId, subject, explanationLang } = await request.json(); // explanationLang added
+        console.log('[API] Study Guide Generate Request Received');
+        const body = await request.json();
+        console.log('[API] Request Body:', body);
+        const { videoId, subject, explanationLang } = body;
 
         if (!videoId) {
             return NextResponse.json({ error: 'Missing videoId' }, { status: 400 });
@@ -38,11 +41,15 @@ export async function POST(request: Request) {
         let transcriptText = "";
         try {
             // Plan A: youtube-transcript
+            console.log('[API] Trying Plan A: youtube-transcript');
             const transcript = await YoutubeTranscript.fetchTranscript(videoId);
             transcriptText = transcript.map((t: any) => t.text).join(' ');
+            console.log('[API] Plan A Success. Length:', transcriptText.length);
         } catch (errA) {
+            console.warn('[API] Plan A failed:', errA);
             try {
                 // Plan B: youtubei.js
+                console.log('[API] Trying Plan B: youtubei.js');
                 const youtube = await Innertube.create({ cache: new UniversalCache(false), generate_session_locally: true });
                 const info = await youtube.getInfo(videoId);
                 const transcriptData = await info.getTranscript();
@@ -51,6 +58,7 @@ export async function POST(request: Request) {
                     transcriptText = transcriptData.transcript.content.body.initial_segments
                         .map((segment: any) => segment.snippet.text)
                         .join(' ');
+                    console.log('[API] Plan B Success. Length:', transcriptText.length);
                 }
             } catch (errB) {
                 console.error('[API] Failed to fetch transcript:', errB);
@@ -103,6 +111,7 @@ export async function POST(request: Request) {
         `;
 
         const result = await model.generateContent(prompt);
+        console.log('[API] Gemini Generation Complete');
         const text = result.response.text().replace(/```json|```/g, '').trim();
         const data = JSON.parse(text);
 

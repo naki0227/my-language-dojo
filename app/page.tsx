@@ -336,6 +336,7 @@ function HomeContent() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: expLang })
           });
+          console.log(`[Frontend] API Status: ${genRes.status} ${genRes.statusText}`);
           const genData = await genRes.json();
           if (genData.success && genData.data) {
             setStudyGuide(genData.data);
