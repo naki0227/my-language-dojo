@@ -15,17 +15,19 @@ export const maxDuration = 120;
 
 export async function POST(request: Request) {
     try {
-        const { videoId, subject } = await request.json();
+        const { videoId, subject, explanationLang } = await request.json(); // explanationLang added
 
         if (!videoId) {
             return NextResponse.json({ error: 'Missing videoId' }, { status: 400 });
         }
 
+        const targetExplanationLang = explanationLang || 'Japanese';
+
         // 1. Check if already exists (Double check)
         const { data: existing } = await adminSupabase
             .from('video_study_guides')
             .select('*')
-            .eq('video_id', videoId)
+            .match({ video_id: videoId, explanation_lang: targetExplanationLang }) // Check specific lang
             .single();
 
         if (existing) {
@@ -66,7 +68,8 @@ export async function POST(request: Request) {
 
         const prompt = `
         You are a language teacher creating a study guide for a video.
-        Target Language: ${subject || 'English'}
+        Target Language (Video Language): ${subject || 'English'}
+        Explanation Language: ${targetExplanationLang}
         
         Analyze the following transcript and create a comprehensive study guide.
         
@@ -76,15 +79,15 @@ export async function POST(request: Request) {
         Output JSON format:
         {
             "title": "A catchy title for this lesson",
-            "summary": "A 3-sentence summary of the video content in Japanese.",
+            "summary": "A 3-sentence summary of the video content in ${targetExplanationLang}.",
             "key_sentences": [
-                { "sentence": "Original sentence", "translation": "Japanese translation", "explanation": "Why this is important" }
+                { "sentence": "Original sentence in Target Language", "translation": "Translation in ${targetExplanationLang}", "explanation": "Explanation in ${targetExplanationLang}" }
             ],
             "vocabulary": [
-                { "word": "Word", "meaning": "Japanese meaning", "context": "Example usage from video or similar" }
+                { "word": "Word in Target Language", "meaning": "Meaning in ${targetExplanationLang}", "context": "Example usage" }
             ],
             "grammar": [
-                { "point": "Grammar point", "explanation": "Explanation in Japanese" }
+                { "point": "Grammar point", "explanation": "Explanation in ${targetExplanationLang}" }
             ],
             "quiz": [
                 { "question": "Question about the video content (in Target Language)", "options": ["A", "B", "C", "D"], "answer": "Correct Option (e.g. A)" }
@@ -92,7 +95,7 @@ export async function POST(request: Request) {
         }
         
         Requirements:
-        1. "key_sentences": Pick 3-5 most useful sentences. The "sentence" MUST be in the Target Language (e.g. English). The "explanation" MUST be in Japanese and explain the grammar/nuance.
+        1. "key_sentences": Pick 3-5 most useful sentences. The "sentence" MUST be in the Target Language. The "explanation" MUST be in ${targetExplanationLang}.
         2. "vocabulary": Pick 5-10 difficult/useful words.
         3. "grammar": Pick 2-3 grammar points used in the video.
         4. "quiz": Create 3 comprehension questions.
@@ -106,13 +109,14 @@ export async function POST(request: Request) {
         // 4. Save to DB
         const { error } = await adminSupabase.from('video_study_guides').upsert([{
             video_id: videoId,
+            explanation_lang: targetExplanationLang, // Save lang
             title: data.title,
             summary: data.summary,
             key_sentences: data.key_sentences,
             vocabulary: data.vocabulary,
             grammar: data.grammar,
             quiz: data.quiz
-        }], { onConflict: 'video_id' });
+        }], { onConflict: 'video_id, explanation_lang' }); // Update conflict target
 
         if (error) throw error;
 

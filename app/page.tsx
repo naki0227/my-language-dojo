@@ -206,6 +206,7 @@ function HomeContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
+  const [explanationLang, setExplanationLang] = useState('Japanese'); // Default explanation lang
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [studyGuide, setStudyGuide] = useState<any>(null); // New State
@@ -303,11 +304,12 @@ function HomeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadVideo = useCallback(async (id: string) => {
-    if (id === loadedVideoIdRef.current) return;
+  const loadVideo = useCallback(async (id: string, expLang: string = 'Japanese') => {
+    if (id === loadedVideoIdRef.current && expLang === explanationLang) return;
     loadedVideoIdRef.current = id;
 
     setVideoId(id);
+    setExplanationLang(expLang); // Update state
     setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
     setSelectedLangs([]); setLoadedLang(null); setShowTranslation(false);
     setIsSubtitleLoading(true);
@@ -319,20 +321,20 @@ function HomeContent() {
       const { data: guide } = await supabase
         .from('video_study_guides')
         .select('*')
-        .eq('video_id', id)
+        .match({ video_id: id, explanation_lang: expLang }) // Match lang
         .single();
 
       if (guide) {
         setStudyGuide(guide);
       } else {
         // Auto-generate
-        console.log("No study guide found. Auto-generating...");
+        console.log(`No study guide found for ${expLang}. Auto-generating...`);
         setIsGeneratingGuide(true);
         try {
           const genRes = await fetch('/api/study_guide/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoId: id, subject: userProfile.learning_target })
+            body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: expLang })
           });
           const genData = await genRes.json();
           if (genData.success && genData.data) {
@@ -726,6 +728,17 @@ function HomeContent() {
               {/* PC用ヘッダー */}
               <div className="p-4 border-b flex justify-between items-center relative">
                 <h2 className="text-sm font-bold opacity-50">Study Guide</h2>
+                <div className="flex gap-2">
+                  {['Japanese', 'English', 'Spanish'].map(lang => (
+                    <button
+                      key={lang}
+                      onClick={() => loadVideo(videoId, lang)}
+                      className={`text-xs px-2 py-1 rounded border ${explanationLang === lang ? 'bg-indigo-100 text-indigo-700 border-indigo-300 font-bold' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                    >
+                      {lang === 'Japanese' ? '🇯🇵' : lang === 'English' ? '🇺🇸' : '🇪🇸'}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
                 {studyGuide ? (
