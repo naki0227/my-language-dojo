@@ -205,6 +205,7 @@ function HomeContent() {
   const [isAudioOnly, setIsAudioOnly] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
+  const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [studyGuide, setStudyGuide] = useState<any>(null); // New State
@@ -324,8 +325,26 @@ function HomeContent() {
       if (guide) {
         setStudyGuide(guide);
       } else {
-        // Fallback or just show empty
-        console.log("No study guide found");
+        // Auto-generate
+        console.log("No study guide found. Auto-generating...");
+        setIsGeneratingGuide(true);
+        try {
+          const genRes = await fetch('/api/study_guide/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ videoId: id, subject: userProfile.learning_target })
+          });
+          const genData = await genRes.json();
+          if (genData.success && genData.data) {
+            setStudyGuide(genData.data);
+          } else {
+            console.error("Failed to auto-generate guide");
+          }
+        } catch (e) {
+          console.error("Auto-gen error", e);
+        } finally {
+          setIsGeneratingGuide(false);
+        }
       }
 
       // 2. (Optional) Fetch subtitles if you still want them for internal logic (like word click), 
@@ -776,10 +795,16 @@ function HomeContent() {
                       </div>
                     </div>
                   </div>
+                ) : isGeneratingGuide ? (
+                  <div className="text-center py-10 animate-pulse">
+                    <p className="text-2xl mb-2">🤖</p>
+                    <p className="font-bold text-indigo-600">Generating Study Guide...</p>
+                    <p className="text-xs text-gray-500">AI is analyzing the video content for you.</p>
+                  </div>
                 ) : (
                   <div className="text-center py-10 opacity-60">
                     <p className="mb-2 font-bold">Study Guide Not Found</p>
-                    <p className="text-xs">Please generate it in the Admin Dashboard.</p>
+                    <p className="text-xs">Could not generate guide for this video.</p>
                   </div>
                 )}
               </div>
