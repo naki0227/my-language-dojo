@@ -338,7 +338,8 @@ function HomeContent() {
           if (genData.success && genData.data) {
             setStudyGuide(genData.data);
           } else {
-            console.error("Failed to auto-generate guide");
+            console.error("Failed to auto-generate guide:", genData);
+            alert(`Guide Generation Failed: ${genData.error || 'Unknown Error'}`);
           }
         } catch (e) {
           console.error("Auto-gen error", e);
