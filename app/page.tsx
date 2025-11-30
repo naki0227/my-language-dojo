@@ -12,7 +12,7 @@ import ProfileModal from '@/components/ProfileModal';
 import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import AIChatButton from '@/components/AIChatButton';
-import InternalVideoSearchModal from '@/components/InternalVideoSearchModal ';
+import VideoSearchModal from '@/components/VideoSearchModal';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
 import { ExternalLink, AlertCircle, HelpCircle } from 'lucide-react';
 
@@ -1114,7 +1114,7 @@ function HomeContent() {
       )}
 
       {isSearchOpen && (
-        <InternalVideoSearchModal
+        <VideoSearchModal
           onClose={() => setIsSearchOpen(false)}
           currentSubject={userProfile.learning_target}
           onSelect={(id: string) => {

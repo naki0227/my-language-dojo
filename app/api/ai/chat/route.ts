@@ -104,19 +104,54 @@ export async function POST(request: Request) {
                         thumbnail: v.thumbnail_url
                     }));
                 } else {
-                    // ヒットしなければランダムに少し提案 (フォールバック)
-                    const { data: randomVideos } = await adminSupabase
-                        .from('library_videos')
-                        .select('video_id, title, thumbnail_url')
-                        .limit(3);
+                    // ヒットしなければYouTubeから検索 (フォールバック)
+                    try {
+                        const youtube = await Innertube.create({
+                            cache: new UniversalCache(false),
+                            generate_session_locally: true,
+                        });
 
-                    if (randomVideos) {
-                        recommendedVideos = randomVideos.map(v => ({
-                            id: v.video_id,
-                            title: v.title,
-                            thumbnail: v.thumbnail_url
-                        }));
-                        aiResponse.reply += "\n(条件に合う動画が見つからなかったので、新着動画を表示します)";
+                        const search = await youtube.search(aiResponse.searchKeyword);
+                        const rawVideos = search.videos || [];
+
+                        if (rawVideos.length > 0) {
+                            recommendedVideos = rawVideos.slice(0, 3).map((v: any) => ({
+                                id: v.id,
+                                title: v.title?.toString() || v.title?.text || 'Untitled',
+                                thumbnail: v.thumbnails?.[0]?.url || ''
+                            }));
+                            aiResponse.reply += "\n(内部ライブラリに見つからなかったため、YouTubeから検索しました)";
+                        } else {
+                            // YouTubeでもなければランダム
+                            const { data: randomVideos } = await adminSupabase
+                                .from('library_videos')
+                                .select('video_id, title, thumbnail_url')
+                                .limit(3);
+
+                            if (randomVideos) {
+                                recommendedVideos = randomVideos.map(v => ({
+                                    id: v.video_id,
+                                    title: v.title,
+                                    thumbnail: v.thumbnail_url
+                                }));
+                                aiResponse.reply += "\n(条件に合う動画が見つからなかったので、新着動画を表示します)";
+                            }
+                        }
+                    } catch (ytError) {
+                        console.error('YouTube Search Error in Chat:', ytError);
+                        // エラー時はランダム
+                        const { data: randomVideos } = await adminSupabase
+                            .from('library_videos')
+                            .select('video_id, title, thumbnail_url')
+                            .limit(3);
+
+                        if (randomVideos) {
+                            recommendedVideos = randomVideos.map(v => ({
+                                id: v.video_id,
+                                title: v.title,
+                                thumbnail: v.thumbnail_url
+                            }));
+                        }
                     }
                 }
 
