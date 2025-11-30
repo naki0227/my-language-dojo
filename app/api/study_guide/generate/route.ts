@@ -79,6 +79,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'No transcript found.' }, { status: 404 });
         }
 
+        // 2. Fetch Transcript (Only if needed, but we need it for context anyway)
+        // ... (Transcript fetching logic remains same) ...
+
+        // 1.5 Check for Reference Guide (Any language)
+        const { data: referenceGuide } = await adminSupabase
+            .from('video_study_guides')
+            .select('*')
+            .eq('video_id', videoId)
+            .limit(1)
+            .maybeSingle();
+
         // 3. Generate Study Guide
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
         const model = genAI.getGenerativeModel({
@@ -86,41 +97,98 @@ export async function POST(request: Request) {
             generationConfig: { responseMimeType: "application/json" }
         });
 
-        const prompt = `
-        You are a language teacher creating a study guide for a video.
-        Target Language (Video Language): ${subject || 'English'}
-        Explanation Language: ${targetExplanationLang}
-        
-        Analyze the following transcript and create a comprehensive study guide.
-        
-        Transcript:
-        ${transcriptText.substring(0, 30000)}... (truncated if too long)
-        
-        Output JSON format:
-        {
-            "title": "A catchy title for this lesson",
-            "summary": "A 3-sentence summary of the video content in ${targetExplanationLang}.",
-            "key_sentences": [
-                { "sentence": "Original sentence in Target Language", "translation": "Translation in ${targetExplanationLang}", "explanation": "Explanation in ${targetExplanationLang}" }
-            ],
-            "vocabulary": [
-                { "word": "Word in Target Language", "meaning": "Meaning in ${targetExplanationLang}", "context": "Example usage" }
-            ],
-            "grammar": [
-                { "point": "Grammar point", "explanation": "Explanation in ${targetExplanationLang}" }
-            ],
-            "quiz": [
-                { "question": "Question about the video content (in Target Language)", "options": ["A", "B", "C", "D"], "answer": "Correct Option (e.g. A)" }
-            ]
+        let prompt = "";
+
+        if (referenceGuide) {
+            console.log('[API] Using Reference Guide for Consistency');
+            const refSentences = referenceGuide.key_sentences.map((s: any) => s.sentence).join('\n');
+            const refVocab = referenceGuide.vocabulary.map((v: any) => v.word).join('\n');
+            const refGrammar = referenceGuide.grammar.map((g: any) => g.point).join('\n');
+
+            prompt = `
+            You are a language teacher creating a study guide for a video.
+            Target Language (Video Language): ${subject || 'English'}
+            Explanation Language: ${targetExplanationLang}
+            
+            Analyze the following transcript and create a comprehensive study guide.
+            
+            Transcript:
+            ${transcriptText.substring(0, 30000)}... (truncated if too long)
+
+            IMPORTANT: You MUST use the following EXACT items for consistency with other language guides.
+            
+            Required Key Sentences (Translate and Explain these):
+            ${refSentences}
+
+            Required Vocabulary (Define these):
+            ${refVocab}
+
+            Required Grammar Points (Explain these):
+            ${refGrammar}
+            
+            Output JSON format:
+            {
+                "title": "A catchy title for this lesson",
+                "summary": "A 3-sentence summary of the video content in ${targetExplanationLang}.",
+                "key_sentences": [
+                    { "sentence": "Original sentence (MUST MATCH REQUIRED)", "translation": "Translation in ${targetExplanationLang}", "explanation": "Explanation in ${targetExplanationLang}" }
+                ],
+                "vocabulary": [
+                    { "word": "Word (MUST MATCH REQUIRED)", "meaning": "Meaning in ${targetExplanationLang}", "context": "Example usage" }
+                ],
+                "grammar": [
+                    { "point": "Grammar point (MUST MATCH REQUIRED)", "explanation": "Explanation in ${targetExplanationLang}" }
+                ],
+                "quiz": [
+                    { "question": "Question about the video content (in Target Language)", "options": ["A", "B", "C", "D"], "answer": "Correct Option (e.g. A)" }
+                ]
+            }
+            
+            Requirements:
+            1. "key_sentences": Use the EXACT sentences provided above. Provide translation and explanation in ${targetExplanationLang}.
+            2. "vocabulary": Use the EXACT words provided above. Provide meaning in ${targetExplanationLang}.
+            3. "grammar": Use the EXACT grammar points provided above. Provide explanation in ${targetExplanationLang}.
+            4. "quiz": Create 3 comprehension questions.
+            5. Output ONLY the JSON.
+            `;
+        } else {
+            // Original Prompt for fresh generation
+            prompt = `
+            You are a language teacher creating a study guide for a video.
+            Target Language (Video Language): ${subject || 'English'}
+            Explanation Language: ${targetExplanationLang}
+            
+            Analyze the following transcript and create a comprehensive study guide.
+            
+            Transcript:
+            ${transcriptText.substring(0, 30000)}... (truncated if too long)
+            
+            Output JSON format:
+            {
+                "title": "A catchy title for this lesson",
+                "summary": "A 3-sentence summary of the video content in ${targetExplanationLang}.",
+                "key_sentences": [
+                    { "sentence": "Original sentence in Target Language", "translation": "Translation in ${targetExplanationLang}", "explanation": "Explanation in ${targetExplanationLang}" }
+                ],
+                "vocabulary": [
+                    { "word": "Word in Target Language", "meaning": "Meaning in ${targetExplanationLang}", "context": "Example usage" }
+                ],
+                "grammar": [
+                    { "point": "Grammar point", "explanation": "Explanation in ${targetExplanationLang}" }
+                ],
+                "quiz": [
+                    { "question": "Question about the video content (in Target Language)", "options": ["A", "B", "C", "D"], "answer": "Correct Option (e.g. A)" }
+                ]
+            }
+            
+            Requirements:
+            1. "key_sentences": Pick 3-5 most useful sentences. The "sentence" MUST be in the Target Language. The "explanation" MUST be in ${targetExplanationLang}.
+            2. "vocabulary": Pick 5-10 difficult/useful words.
+            3. "grammar": Pick 2-3 grammar points used in the video.
+            4. "quiz": Create 3 comprehension questions.
+            5. Output ONLY the JSON.
+            `;
         }
-        
-        Requirements:
-        1. "key_sentences": Pick 3-5 most useful sentences. The "sentence" MUST be in the Target Language. The "explanation" MUST be in ${targetExplanationLang}.
-        2. "vocabulary": Pick 5-10 difficult/useful words.
-        3. "grammar": Pick 2-3 grammar points used in the video.
-        4. "quiz": Create 3 comprehension questions.
-        5. Output ONLY the JSON.
-        `;
 
         const result = await model.generateContent(prompt);
         console.log('[API] Gemini Generation Complete');

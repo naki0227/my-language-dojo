@@ -888,103 +888,146 @@ function HomeContent() {
                       {/* Key Sentences Section */}
                       <div>
                         <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>🔑 Key Sentences</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            if (!guide?.key_sentences) return null;
-                            return (
-                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
-                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
-                                </h4>
-                                <ul className="space-y-4">
-                                  {guide.key_sentences.map((s: any, i: number) => (
-                                    <li key={i} className="text-sm">
-                                      <p className={`font-bold mb-1 ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
-                                      <p className={`text-xs mb-1 ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
-                                      <p className="text-indigo-500 text-xs">💡 {s.explanation}</p>
-                                    </li>
-                                  ))}
-                                </ul>
+                        <div className="space-y-4">
+                          {(() => {
+                            // Use the first available guide as the "Master" structure
+                            const masterLang = explanationLangs.find(l => studyGuides[l]);
+                            const masterGuide = masterLang ? studyGuides[masterLang] : null;
+
+                            if (!masterGuide?.key_sentences) return <p className="text-sm opacity-50">No key sentences found.</p>;
+
+                            return masterGuide.key_sentences.map((masterItem: any, index: number) => (
+                              <div key={index} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                {/* Original Sentence (Shared) */}
+                                <p className={`font-bold text-lg mb-3 ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.sentence}</p>
+
+                                {/* Explanations per Language */}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {explanationLangs.map(lang => {
+                                    const guide = studyGuides[lang];
+                                    // Try to find matching item by index (since we enforce order in API) or fuzzy match
+                                    const item = guide?.key_sentences?.[index] || guide?.key_sentences?.find((s: any) => s.sentence === masterItem.sentence);
+
+                                    if (!item) return null;
+
+                                    return (
+                                      <div key={lang} className={`p-3 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
+                                        <div className="flex items-center gap-2 mb-2 opacity-70">
+                                          <span className="text-xs font-bold">{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}</span>
+                                        </div>
+                                        <p className={`text-sm mb-1 ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{item.translation}</p>
+                                        <p className="text-indigo-500 text-xs">💡 {item.explanation}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            );
-                          })}
+                            ));
+                          })()}
                         </div>
                       </div>
 
                       {/* Vocabulary Section */}
                       <div>
                         <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>📚 Vocabulary</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            if (!guide?.vocabulary) return null;
-                            return (
-                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
-                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
-                                </h4>
-                                <div className="space-y-2">
-                                  {guide.vocabulary.map((v: any, i: number) => (
-                                    <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
-                                      <div className="min-w-0">
-                                        <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
-                                        <span className="text-gray-500 mx-1">-</span>
-                                        <span className={`truncate ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
+                        <div className="space-y-4">
+                          {(() => {
+                            const masterLang = explanationLangs.find(l => studyGuides[l]);
+                            const masterGuide = masterLang ? studyGuides[masterLang] : null;
+
+                            if (!masterGuide?.vocabulary) return <p className="text-sm opacity-50">No vocabulary found.</p>;
+
+                            return masterGuide.vocabulary.map((masterItem: any, index: number) => (
+                              <div key={index} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <div className="flex justify-between items-start mb-3">
+                                  <p className={`font-bold text-lg ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.word}</p>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDictData({ word: masterItem.word, translation: masterItem.meaning, sourceLang: userProfile.learning_target });
+                                      const save = async () => {
+                                        if (!userId) return;
+                                        try {
+                                          await supabase.from('vocab').insert([{ user_id: userId, word: masterItem.word, translation: masterItem.meaning, subject: userProfile.learning_target }]);
+                                          await addXp(10); alert(`Saved: ${masterItem.word} (+10 XP)`);
+                                        } catch { alert('Save failed'); }
+                                      };
+                                      save();
+                                    }}
+                                    className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 transition"
+                                  >
+                                    ＋ Save
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {explanationLangs.map(lang => {
+                                    const guide = studyGuides[lang];
+                                    const item = guide?.vocabulary?.[index] || guide?.vocabulary?.find((v: any) => v.word === masterItem.word);
+
+                                    if (!item) return null;
+
+                                    return (
+                                      <div key={lang} className={`p-3 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
+                                        <div className="flex items-center gap-2 mb-1 opacity-70">
+                                          <span className="text-xs font-bold">{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}</span>
+                                        </div>
+                                        <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{item.meaning}</p>
                                       </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
-                                          const save = async () => {
-                                            if (!userId) return;
-                                            try {
-                                              await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
-                                              await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
-                                            } catch { alert('Save failed'); }
-                                          };
-                                          save();
-                                        }}
-                                        className="text-xs bg-green-100 text-green-700 px-1 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition shrink-0"
-                                      >
-                                        ＋
-                                      </button>
-                                    </div>
-                                  ))}
+                                    );
+                                  })}
                                 </div>
                               </div>
-                            );
-                          })}
+                            ));
+                          })()}
                         </div>
                       </div>
 
                       {/* Grammar Section */}
                       <div>
                         <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>📐 Grammar</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            if (!guide?.grammar) return null;
-                            return (
-                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
-                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
-                                </h4>
-                                <ul className="space-y-2">
-                                  {guide.grammar.map((g: any, i: number) => (
-                                    <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
-                                      <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
-                                      <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
-                                    </li>
-                                  ))}
-                                </ul>
+                        <div className="space-y-4">
+                          {(() => {
+                            const masterLang = explanationLangs.find(l => studyGuides[l]);
+                            const masterGuide = masterLang ? studyGuides[masterLang] : null;
+
+                            if (!masterGuide?.grammar) return <p className="text-sm opacity-50">No grammar points found.</p>;
+
+                            return masterGuide.grammar.map((masterItem: any, index: number) => (
+                              <div key={index} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <p className={`font-bold text-lg mb-3 ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{masterItem.point}</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                  {explanationLangs.map(lang => {
+                                    const guide = studyGuides[lang];
+                                    const item = guide?.grammar?.[index] || guide?.grammar?.find((g: any) => g.point === masterItem.point);
+
+                                    if (!item) return null;
+
+                                    return (
+                                      <div key={lang} className={`p-3 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
+                                        <div className="flex items-center gap-2 mb-1 opacity-70">
+                                          <span className="text-xs font-bold">{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}</span>
+                                        </div>
+                                        <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{item.explanation}</p>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            );
-                          })}
+                            ));
+                          })()}
                         </div>
                       </div>
 
-                      {/* Quiz Section */}
+                      {/* Quiz Section (Keep as is, separate quizzes per language might be better or confusing? User asked for "video content quiz also in selected language". 
+                           If we merge, we assume questions are identical. But questions might differ if generated separately.
+                           Let's keep them separate for now as merging questions is harder (no unique ID).
+                           OR, we can just display them side-by-side as before since they are distinct interactions.
+                           The user request "KeySentences, Vocabulary, Grammar" specifically mentioned merging. Quiz was separate request.
+                           "Also, display video content quiz in selected language" -> This implies just showing it.
+                           Let's keep the previous Grid layout for Quiz for now, or stack them.
+                        */}
                       <div>
                         <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>🧩 Quiz</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
