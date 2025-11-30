@@ -304,7 +304,15 @@ function HomeContent() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { router.push('/auth'); return; }
+      if (!session) {
+        // Guest Mode
+        setUserId(null);
+        setUsername('Guest');
+        setUserProfile({
+          id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: 'Try the app!', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
+        });
+        return;
+      }
       setUserId(session.user.id);
       fetchProfile(session.user.id);
     };
@@ -464,7 +472,12 @@ function HomeContent() {
   };
 
   const handleSaveSettings = async (newTheme: 'kids' | 'student' | 'pro', newGoal: string, newLangs: string[]) => {
-    if (!userId) return;
+    // Guest Mode: Update local state only
+    if (!userId) {
+      setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
+      setIsSettingsOpen(false);
+      return;
+    }
     try {
       await supabase.from('profiles').update({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs }).eq('id', userId);
       setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
@@ -827,11 +840,15 @@ function HomeContent() {
 
                     return masterGuide.vocabulary.map((masterItem: any, index: number) => (
                       <div key={index} className={`p-4 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                        <div className="flex justify-between items-center mb-3 border-b border-gray-700 pb-2">
-                          <p className={`font-bold text-xl ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.word}</p>
+                        <div className="flex justify-between items-start mb-3">
+                          <p className={`font-bold text-lg ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.word}</p>
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
+                              if (!userId) {
+                                alert("Please login to save vocabulary!");
+                                return;
+                              }
                               setDictData({ word: masterItem.word, translation: masterItem.meaning, sourceLang: userProfile.learning_target });
                               const save = async () => {
                                 if (!userId) return;
@@ -842,9 +859,9 @@ function HomeContent() {
                               };
                               save();
                             }}
-                            className="text-xs bg-green-600 text-white px-3 py-1 rounded-full hover:bg-green-500 transition font-bold"
+                            className={`text-xs px-2 py-1 rounded transition ${userId ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                           >
-                            ＋ Save
+                            {userId ? '＋ Save' : '🔒 Save'}
                           </button>
                         </div>
 
@@ -945,7 +962,7 @@ function HomeContent() {
               </div>
 
             </div>
-          </div>
+          </div >
         ) : isGeneratingGuide ? (
           <div className="text-center py-10 animate-pulse">
             <p className="text-2xl mb-2">🤖</p>
@@ -957,9 +974,10 @@ function HomeContent() {
             <p className="mb-2 font-bold">Study Guide Not Found</p>
             <p className="text-xs">Could not generate guide for this video.</p>
           </div>
-        )}
-      </div>
-    </div>
+        )
+        }
+      </div >
+    </div >
   );
 
   return (
@@ -992,7 +1010,14 @@ function HomeContent() {
             </div>
           </div>
         </div>
-        <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
+        <div className="flex items-center gap-2">
+          {!userId && (
+            <Link href="/auth" className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-bold shadow transition">
+              Login
+            </Link>
+          )}
+          <button onClick={() => setIsSettingsOpen(true)} className="text-xl p-1 hover:opacity-70 transition">⚙️</button>
+        </div>
       </div>
 
       {/* 設定パネル */}
@@ -1084,6 +1109,13 @@ function HomeContent() {
           <div className="flex w-full h-full max-w-6xl mx-auto p-6 gap-6">
             <div className="flex-1 overflow-y-auto space-y-6 pr-2">
               {!isKids && userId && <Heatmap userId={userId} />}
+              {!userId && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                  <p className="text-sm text-blue-800 font-bold mb-2">👋 Welcome Guest!</p>
+                  <p className="text-xs text-blue-600 mb-2">Sign in to save your progress and vocabulary.</p>
+                  <Link href="/auth" className="inline-block bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-blue-700 transition">Login / Sign Up</Link>
+                </div>
+              )}
               <PlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
               <button onClick={() => setIsAudioOnly(!isAudioOnly)} className="w-full py-2 bg-gray-200 text-sm font-bold rounded">Switch to Audio Only</button>
               <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
