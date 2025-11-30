@@ -882,96 +882,140 @@ function HomeContent() {
                       )}
                     </div>
 
-                    {/* Multi-Column Content */}
-                    <div className={`grid grid-cols-1 ${explanationLangs.length === 2 ? 'md:grid-cols-2' : explanationLangs.length >= 3 ? 'md:grid-cols-3' : ''} gap-4`}>
-                      {explanationLangs.map(lang => {
-                        const guide = studyGuides[lang];
-                        if (!guide) return null;
-                        return (
-                          <div key={lang} className="space-y-6 min-w-0">
-                            <h4 className="font-bold text-center opacity-50 border-b pb-2">{lang}</h4>
+                    {/* Grouped by Section Content */}
+                    <div className="space-y-8">
 
-                            {/* Key Sentences */}
-                            <div>
-                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🔑 Key Sentences</h3>
-                              <ul className="space-y-3">
-                                {guide.key_sentences?.map((s: any, i: number) => (
-                                  <li key={i} className="text-sm">
-                                    <p className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
-                                    <p className={`text-xs ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
-                                    <p className="text-indigo-500 text-xs mt-1">💡 {s.explanation}</p>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            {/* Vocabulary */}
-                            <div>
-                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📚 Vocabulary</h3>
-                              <div className="grid grid-cols-1 gap-2">
-                                {guide.vocabulary?.map((v: any, i: number) => (
-                                  <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
-                                    <div className="min-w-0">
-                                      <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
-                                      <span className="text-gray-500 mx-1">-</span>
-                                      <span className={`truncate ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
-                                    </div>
-                                    <button
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
-                                        const save = async () => {
-                                          if (!userId) return;
-                                          try {
-                                            await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
-                                            await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
-                                          } catch { alert('Save failed'); }
-                                        };
-                                        save();
-                                      }}
-                                      className="text-xs bg-green-100 text-green-700 px-1 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition shrink-0"
-                                    >
-                                      ＋
-                                    </button>
-                                  </div>
-                                ))}
+                      {/* Key Sentences Section */}
+                      <div>
+                        <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>🔑 Key Sentences</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {explanationLangs.map(lang => {
+                            const guide = studyGuides[lang];
+                            if (!guide?.key_sentences) return null;
+                            return (
+                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
+                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
+                                </h4>
+                                <ul className="space-y-4">
+                                  {guide.key_sentences.map((s: any, i: number) => (
+                                    <li key={i} className="text-sm">
+                                      <p className={`font-bold mb-1 ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
+                                      <p className={`text-xs mb-1 ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
+                                      <p className="text-indigo-500 text-xs">💡 {s.explanation}</p>
+                                    </li>
+                                  ))}
+                                </ul>
                               </div>
-                            </div>
+                            );
+                          })}
+                        </div>
+                      </div>
 
-                            {/* Grammar */}
-                            <div>
-                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📐 Grammar</h3>
-                              <ul className="space-y-2">
-                                {guide.grammar?.map((g: any, i: number) => (
-                                  <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
-                                    <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
-                                    <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-
-                            {/* Quiz */}
-                            <div>
-                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🧩 Quiz</h3>
-                              <div className="space-y-4">
-                                {guide.quiz?.map((q: any, i: number) => (
-                                  <div key={i} className="text-sm">
-                                    <p className={`font-bold mb-1 ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
-                                    <div className="pl-2 space-y-1">
-                                      {q.options?.map((opt: string, oi: number) => (
-                                        <div key={oi} className={`${isPro ? 'text-gray-400' : 'text-gray-600'}`}>
-                                          {opt === q.answer ? '✅' : '⚪️'} {opt}
-                                        </div>
-                                      ))}
+                      {/* Vocabulary Section */}
+                      <div>
+                        <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>📚 Vocabulary</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {explanationLangs.map(lang => {
+                            const guide = studyGuides[lang];
+                            if (!guide?.vocabulary) return null;
+                            return (
+                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
+                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
+                                </h4>
+                                <div className="space-y-2">
+                                  {guide.vocabulary.map((v: any, i: number) => (
+                                    <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
+                                      <div className="min-w-0">
+                                        <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
+                                        <span className="text-gray-500 mx-1">-</span>
+                                        <span className={`truncate ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
+                                      </div>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
+                                          const save = async () => {
+                                            if (!userId) return;
+                                            try {
+                                              await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
+                                              await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
+                                            } catch { alert('Save failed'); }
+                                          };
+                                          save();
+                                        }}
+                                        className="text-xs bg-green-100 text-green-700 px-1 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition shrink-0"
+                                      >
+                                        ＋
+                                      </button>
                                     </div>
-                                  </div>
-                                ))}
+                                  ))}
+                                </div>
                               </div>
-                            </div>
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Grammar Section */}
+                      <div>
+                        <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>📐 Grammar</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {explanationLangs.map(lang => {
+                            const guide = studyGuides[lang];
+                            if (!guide?.grammar) return null;
+                            return (
+                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
+                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
+                                </h4>
+                                <ul className="space-y-2">
+                                  {guide.grammar.map((g: any, i: number) => (
+                                    <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
+                                      <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
+                                      <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Quiz Section */}
+                      <div>
+                        <h3 className={`font-bold text-lg mb-4 border-b pb-2 ${isPro ? 'text-indigo-300 border-gray-600' : 'text-indigo-700 border-indigo-200'}`}>🧩 Quiz</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {explanationLangs.map(lang => {
+                            const guide = studyGuides[lang];
+                            if (!guide?.quiz) return null;
+                            return (
+                              <div key={lang} className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+                                <h4 className="font-bold text-sm mb-3 opacity-70 flex items-center gap-2">
+                                  {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
+                                </h4>
+                                <div className="space-y-4">
+                                  {guide.quiz.map((q: any, i: number) => (
+                                    <div key={i} className="text-sm">
+                                      <p className={`font-bold mb-1 ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
+                                      <div className="pl-2 space-y-1">
+                                        {q.options?.map((opt: string, oi: number) => (
+                                          <div key={oi} className={`${isPro ? 'text-gray-400' : 'text-gray-600'}`}>
+                                            {opt === q.answer ? '✅' : '⚪️'} {opt}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 ) : isGeneratingGuide ? (
