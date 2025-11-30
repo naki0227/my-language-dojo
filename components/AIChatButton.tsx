@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Minimize2, Maximize2, PlayCircle, BookOpen } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
 type Message = {
@@ -12,6 +13,7 @@ type Message = {
 };
 
 export default function AIChatButton({ userId }: { userId: string }) {
+    const router = useRouter();
     const [isOpen, setIsOpen] = useState(false);
     const [isMinimized, setIsMinimized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
@@ -61,7 +63,7 @@ export default function AIChatButton({ userId }: { userId: string }) {
     const handleVideoSelect = (videoId: string) => {
         // 現在のページがトップページならリロードなしで切り替えたいが、
         // 汎用性を考えてリンク遷移にする
-        window.location.href = `/?videoId=${videoId}`;
+        router.push(`/?videoId=${videoId}`);
     };
 
     if (!isOpen) {

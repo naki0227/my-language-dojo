@@ -1118,7 +1118,6 @@ function HomeContent() {
           onClose={() => setIsSearchOpen(false)}
           currentSubject={userProfile.learning_target}
           onSelect={(id: string) => {
-            setVideoId(id);
             setIsSearchOpen(false);
             // URLパラメータの更新と読み込みは useEffect に任せる
             router.push(`/?videoId=${id}`);
