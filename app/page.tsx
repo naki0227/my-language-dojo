@@ -696,33 +696,6 @@ function HomeContent() {
               </div>
             </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-2">Study Guide Languages (Max 3)</label>
-              <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border p-2 rounded">
-                {SUPPORTED_LANGUAGES.map(lang => {
-                  const isSelected = userProfile.study_guide_langs?.includes(lang.dbName);
-                  return (
-                    <button
-                      key={lang.code}
-                      onClick={() => {
-                        let newLangs = [...(userProfile.study_guide_langs || [])];
-                        if (isSelected) {
-                          newLangs = newLangs.filter(l => l !== lang.dbName);
-                        } else {
-                          if (newLangs.length >= 3) return; // Max 3
-                          newLangs.push(lang.dbName);
-                        }
-                        handleSaveSettings(userProfile.theme, userProfile.goal, newLangs);
-                      }}
-                      className={`text-xs px-2 py-1 rounded border text-left ${isSelected ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-gray-50 border-gray-200'}`}
-                    >
-                      {isSelected ? '✅' : '⬜️'} {lang.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
             <button onClick={() => setIsSettingsOpen(false)} className="w-full py-2 bg-gray-200 rounded font-bold">Close</button>
           </div>
         </div>
@@ -812,9 +785,9 @@ function HomeContent() {
                     onChange={(e) => loadVideo(videoId, e.target.value)}
                     className={`text-xs font-bold border rounded px-2 py-1 cursor-pointer ${isPro ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-50 text-gray-700 border-gray-300'}`}
                   >
-                    {userProfile.study_guide_langs?.map(lang => (
-                      <option key={lang} value={lang}>
-                        {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label || lang}
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <option key={lang.code} value={lang.dbName}>
+                        {lang.label}
                       </option>
                     ))}
                   </select>
