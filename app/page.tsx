@@ -191,7 +191,8 @@ function HomeContent() {
 
   // ユーザー情報
   const [userId, setUserId] = useState<string | null>(null);
-  const [username, setUsername] = useState('Hero');
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [username, setUsername] = useState<string>('');
   const [userProfile, setUserProfile] = useState<UserProfile>({
     id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
   });
@@ -307,9 +308,14 @@ function HomeContent() {
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      if (session) {
+        setUserId(session.user.id);
+        setUserEmail(session.user.email || null);
+        fetchProfile(session.user.id);
+      } else {
         // Guest Mode
         setUserId(null);
+        setUserEmail(null);
         setUsername('Guest');
         setEditName('Guest');
         setEditGoal('Try the app!');
@@ -1083,6 +1089,17 @@ function HomeContent() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Account</h3>
               <div className="space-y-4">
+                {userEmail && (
+                  <div>
+                    <label className="block text-sm font-bold mb-1 text-gray-700">Email</label>
+                    <input
+                      type="text"
+                      value={userEmail}
+                      readOnly
+                      className="w-full p-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-bold mb-1 text-gray-700">Display Name</label>
                   <input
