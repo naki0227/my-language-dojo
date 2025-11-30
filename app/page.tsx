@@ -389,8 +389,10 @@ function HomeContent() {
 
   useEffect(() => {
     const targetId = paramVideoId || initialVideoId;
-    if (targetId) loadVideo(targetId);
-  }, [paramVideoId, loadVideo]);
+    if (targetId && targetId !== loadedVideoIdRef.current) {
+      loadVideo(targetId);
+    }
+  }, [paramVideoId, initialVideoId, loadVideo]);
 
   const fetchProfile = async (uid: string) => {
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', uid).single();
