@@ -207,7 +207,7 @@ function HomeContent() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const [isGeneratingGuide, setIsGeneratingGuide] = useState(false);
-  const [explanationLang, setExplanationLang] = useState('Japanese'); // Default explanation lang
+  const [explanationLangs, setExplanationLangs] = useState<string[]>(['Japanese']); // Array of langs
 
   // Summary Interactive State
   const [userSummary, setUserSummary] = useState('');
@@ -217,7 +217,7 @@ function HomeContent() {
 
   const [videoId, setVideoId] = useState(initialVideoId);
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
-  const [studyGuide, setStudyGuide] = useState<any>(null); // New State
+  const [studyGuides, setStudyGuides] = useState<Record<string, any>>({}); // Map of guides
   const playerRef = useRef<any | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
 
@@ -312,17 +312,17 @@ function HomeContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadVideo = useCallback(async (id: string, expLang: string = 'Japanese') => {
-    if (id === loadedVideoIdRef.current && expLang === explanationLang) return;
+  const loadVideo = useCallback(async (id: string, expLangs: string[] = ['Japanese']) => {
+    if (id === loadedVideoIdRef.current && JSON.stringify(expLangs) === JSON.stringify(explanationLangs)) return;
     loadedVideoIdRef.current = id;
 
     setVideoId(id);
-    setExplanationLang(expLang); // Update state
+    setExplanationLangs(expLangs); // Update state
     setSubtitles([]); setDictData(null); setSelectedWord(null); setManualTargetText(null);
     setSelectedLangs([]); setLoadedLang(null); setShowTranslation(false);
     setIsSubtitleLoading(true);
     setPlayError(false);
-    setStudyGuide(null); // Reset
+    setStudyGuides({}); // Reset
 
     // Reset Summary State
     setUserSummary('');
@@ -330,42 +330,53 @@ function HomeContent() {
     setIsCheckingSummary(false);
     setShowModelSummary(false);
 
-    try {
-      // 1. Try to fetch Study Guide
-      const { data: guide } = await supabase
-        .from('video_study_guides')
-        .select('*')
-        .match({ video_id: id, explanation_lang: expLang }) // Match lang
-        .single();
+    // Helper to fetch/generate one guide
+    const fetchGuide = async (lang: string) => {
+      try {
+        const { data: guide } = await supabase
+          .from('video_study_guides')
+          .select('*')
+          .match({ video_id: id, explanation_lang: lang })
+          .single();
 
-      if (guide) {
-        setStudyGuide(guide);
-      } else {
+        if (guide) return { lang, data: guide };
+
         // Auto-generate
-        console.log(`No study guide found for ${expLang}. Auto-generating...`);
-        setIsGeneratingGuide(true);
-        try {
-          const genRes = await fetch('/api/study_guide/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: expLang })
-          });
-          console.log(`[Frontend] API Status: ${genRes.status} ${genRes.statusText}`);
-          const genData = await genRes.json();
-          if (genData.success && genData.data) {
-            setStudyGuide(genData.data);
-          } else {
-            console.error("Failed to auto-generate guide:", genData);
-            alert(`Guide Generation Failed: ${genData.error || 'Unknown Error'}`);
-          }
-        } catch (e) {
-          console.error("Auto-gen error", e);
-        } finally {
-          setIsGeneratingGuide(false);
+        console.log(`No study guide found for ${lang}. Auto-generating...`);
+        const genRes = await fetch('/api/study_guide/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: lang })
+        });
+        console.log(`[Frontend] API Status (${lang}): ${genRes.status}`);
+        const genData = await genRes.json();
+        if (genData.success && genData.data) {
+          return { lang, data: genData.data };
+        } else {
+          console.error(`Failed to auto-generate guide for ${lang}:`, genData);
+          return { lang, error: genData.error };
         }
+      } catch (e) {
+        console.error(`Auto-gen error for ${lang}`, e);
+        return { lang, error: e };
       }
+    };
 
-      // 2. (Optional) Fetch subtitles if you still want them for internal logic (like word click), 
+    try {
+      // 1. Fetch all guides in parallel
+      setIsGeneratingGuide(true);
+      const results = await Promise.all(expLangs.map(lang => fetchGuide(lang)));
+
+      const newGuides: Record<string, any> = {};
+      results.forEach(res => {
+        if (res && res.data) {
+          newGuides[res.lang] = res.data;
+        }
+      });
+      setStudyGuides(newGuides);
+      setIsGeneratingGuide(false);
+
+      // 2. Fetch Subtitles (Plan A: youtube-transcript)ill want them for internal logic (like word click), 
       // but we are hiding the TranscriptList. 
       // For now, let's NOT fetch raw transcripts to be safe, or just fetch them for the "VoiceRecorder" context if needed.
       // The user wants to avoid "displaying" them.
@@ -374,7 +385,7 @@ function HomeContent() {
     } catch (e) { console.error('通信エラー', e); }
     finally { setIsSubtitleLoading(false); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [explanationLangs, userProfile.learning_target]);
 
   useEffect(() => {
     const targetId = paramVideoId || initialVideoId;
@@ -429,9 +440,12 @@ function HomeContent() {
       await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
       setUserProfile(prev => ({ ...prev, learning_target: newLang }));
 
-      // Sync Study Guide Language
-      setExplanationLang(newLang);
-      loadVideo(videoId, newLang);
+      // Sync Study Guide Language (Use newLang as primary, keep others if they exist, or just reset to newLang?)
+      // User likely wants to see explanations in their new target language.
+      // Let's just set it to [newLang] for simplicity, or add it?
+      // "studyguideの言語も対象言語と同じ言語にしたい" -> Set to [newLang]
+      setExplanationLangs([newLang]);
+      loadVideo(videoId, [newLang]);
 
       // Reload to refresh other components if needed (or just state update is enough?)
       // window.location.reload(); // Let's try to avoid reload for smoother UX
@@ -615,7 +629,7 @@ function HomeContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [
-            { role: 'system', content: `You are a language teacher. The user has written a summary of a video. Compare it to the model answer: "${studyGuide?.summary}". Give a score (0-100) and brief feedback in ${explanationLang}.` },
+            { role: 'system', content: `You are a language teacher. The user has written a summary of a video. Compare it to the model answer: "${Object.values(studyGuides)[0]?.summary}". Give a score (0-100) and brief feedback in ${explanationLangs[0]}.` },
             { role: 'user', content: userSummary }
           ]
         })
@@ -779,31 +793,43 @@ function HomeContent() {
               {/* PC用ヘッダー */}
               <div className="p-4 border-b flex justify-between items-center relative">
                 <h2 className="text-sm font-bold opacity-50">Study Guide</h2>
-                <div className="flex gap-2">
-                  <select
-                    value={explanationLang}
-                    onChange={(e) => loadVideo(videoId, e.target.value)}
-                    className={`text-xs font-bold border rounded px-2 py-1 cursor-pointer ${isPro ? 'bg-gray-700 text-white border-gray-600' : 'bg-gray-50 text-gray-700 border-gray-300'}`}
-                  >
-                    {SUPPORTED_LANGUAGES.map(lang => (
-                      <option key={lang.code} value={lang.dbName}>
-                        {lang.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="flex gap-2 items-center">
+                  <span className="text-xs font-bold opacity-50">Langs (Max 3):</span>
+                  <div className="flex flex-wrap gap-1">
+                    {SUPPORTED_LANGUAGES.map(lang => {
+                      const isSelected = explanationLangs.includes(lang.dbName);
+                      return (
+                        <button
+                          key={lang.code}
+                          onClick={() => {
+                            let newLangs = [...explanationLangs];
+                            if (isSelected) {
+                              if (newLangs.length > 1) newLangs = newLangs.filter(l => l !== lang.dbName);
+                            } else {
+                              if (newLangs.length < 3) newLangs.push(lang.dbName);
+                            }
+                            loadVideo(videoId, newLangs);
+                          }}
+                          className={`text-xs px-2 py-1 rounded border transition ${isSelected ? (isPro ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-indigo-100 border-indigo-300 text-indigo-700 font-bold') : (isPro ? 'bg-gray-700 border-gray-600 text-gray-400' : 'bg-gray-50 text-gray-500 border-gray-200')}`}
+                        >
+                          {lang.label.split(' ')[0]} {/* Flag only to save space */}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-4">
-                {studyGuide ? (
+                {Object.keys(studyGuides).length > 0 ? (
                   <div className="space-y-6">
-                    {/* Summary */}
+                    {/* Summary Challenge (Shared) */}
                     <div className={`p-4 rounded-lg border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-indigo-50 border-indigo-100'}`}>
                       <h3 className={`font-bold mb-2 ${isPro ? 'text-indigo-300' : 'text-indigo-700'}`}>📝 Summary Challenge</h3>
 
                       {!showModelSummary ? (
                         <div className="space-y-3">
                           <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>
-                            Watch the video and write a 3-sentence summary in {explanationLang}!
+                            Watch the video and write a 3-sentence summary!
                           </p>
                           <textarea
                             value={userSummary}
@@ -833,8 +859,15 @@ function HomeContent() {
                           </div>
 
                           <div className="border-t pt-3">
-                            <p className="text-xs font-bold opacity-50 mb-1">Model Answer</p>
-                            <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuide.summary}</p>
+                            <p className="text-xs font-bold opacity-50 mb-2">Model Answers</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                              {explanationLangs.map(lang => studyGuides[lang] && (
+                                <div key={lang} className={`p-3 rounded border ${isPro ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'}`}>
+                                  <p className="text-xs font-bold mb-1 opacity-70">{lang}</p>
+                                  <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuides[lang].summary}</p>
+                                </div>
+                              ))}
+                            </div>
                           </div>
 
                           <button
@@ -847,83 +880,96 @@ function HomeContent() {
                       )}
                     </div>
 
-                    {/* Key Sentences */}
-                    <div>
-                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🔑 Key Sentences</h3>
-                      <ul className="space-y-3">
-                        {studyGuide.key_sentences?.map((s: any, i: number) => (
-                          <li key={i} className="text-sm">
-                            <p className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
-                            <p className={`text-xs ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
-                            <p className="text-indigo-500 text-xs mt-1">💡 {s.explanation}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                    {/* Multi-Column Content */}
+                    <div className={`grid grid-cols-1 ${explanationLangs.length === 2 ? 'md:grid-cols-2' : explanationLangs.length >= 3 ? 'md:grid-cols-3' : ''} gap-4`}>
+                      {explanationLangs.map(lang => {
+                        const guide = studyGuides[lang];
+                        if (!guide) return null;
+                        return (
+                          <div key={lang} className="space-y-6 min-w-0">
+                            <h4 className="font-bold text-center opacity-50 border-b pb-2">{lang}</h4>
 
-                    {/* Vocabulary */}
-                    <div>
-                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📚 Vocabulary</h3>
-                      <div className="grid grid-cols-1 gap-2">
-                        {studyGuide.vocabulary?.map((v: any, i: number) => (
-                          <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                            {/* Key Sentences */}
                             <div>
-                              <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
-                              <span className="text-gray-500 mx-2">-</span>
-                              <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
+                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🔑 Key Sentences</h3>
+                              <ul className="space-y-3">
+                                {guide.key_sentences?.map((s: any, i: number) => (
+                                  <li key={i} className="text-sm">
+                                    <p className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{s.sentence}</p>
+                                    <p className={`text-xs ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{s.translation}</p>
+                                    <p className="text-indigo-500 text-xs mt-1">💡 {s.explanation}</p>
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
-                                const save = async () => {
-                                  if (!userId) return;
-                                  try {
-                                    await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
-                                    await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
-                                  } catch { alert('Save failed'); }
-                                };
-                                save();
-                              }}
-                              className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition"
-                            >
-                              ＋ Save
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
 
-                    {/* Grammar */}
-                    <div>
-                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📐 Grammar</h3>
-                      <ul className="space-y-2">
-                        {studyGuide.grammar?.map((g: any, i: number) => (
-                          <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
-                            <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
-                            <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                            {/* Vocabulary */}
+                            <div>
+                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📚 Vocabulary</h3>
+                              <div className="grid grid-cols-1 gap-2">
+                                {guide.vocabulary?.map((v: any, i: number) => (
+                                  <div key={i} className={`p-2 rounded border text-sm flex justify-between items-center group ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'}`}>
+                                    <div className="min-w-0">
+                                      <span className={`font-bold ${isPro ? 'text-gray-100' : 'text-gray-800'}`}>{v.word}</span>
+                                      <span className="text-gray-500 mx-1">-</span>
+                                      <span className={`truncate ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{v.meaning}</span>
+                                    </div>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDictData({ word: v.word, translation: v.meaning, sourceLang: userProfile.learning_target });
+                                        const save = async () => {
+                                          if (!userId) return;
+                                          try {
+                                            await supabase.from('vocab').insert([{ user_id: userId, word: v.word, translation: v.meaning, subject: userProfile.learning_target }]);
+                                            await addXp(10); alert(`Saved: ${v.word} (+10 XP)`);
+                                          } catch { alert('Save failed'); }
+                                        };
+                                        save();
+                                      }}
+                                      className="text-xs bg-green-100 text-green-700 px-1 py-1 rounded hover:bg-green-200 opacity-0 group-hover:opacity-100 transition shrink-0"
+                                    >
+                                      ＋
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
 
-                    {/* Quiz */}
-                    <div>
-                      <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🧩 Comprehension Quiz</h3>
-                      <div className="space-y-4">
-                        {studyGuide.quiz?.map((q: any, i: number) => (
-                          <div key={i} className="text-sm">
-                            <p className={`font-bold mb-1 ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
-                            <div className="pl-2 space-y-1">
-                              {q.options?.map((opt: string, oi: number) => (
-                                <div key={oi} className={`${isPro ? 'text-gray-400' : 'text-gray-600'}`}>
-                                  {opt === q.answer ? '✅' : '⚪️'} {opt}
-                                </div>
-                              ))}
+                            {/* Grammar */}
+                            <div>
+                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>📐 Grammar</h3>
+                              <ul className="space-y-2">
+                                {guide.grammar?.map((g: any, i: number) => (
+                                  <li key={i} className={`text-sm p-2 rounded border ${isPro ? 'bg-gray-700 border-gray-600' : 'bg-yellow-50 border-yellow-100'}`}>
+                                    <span className={`font-bold block ${isPro ? 'text-yellow-400' : 'text-yellow-800'}`}>{g.point}</span>
+                                    <span className={`${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{g.explanation}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+
+                            {/* Quiz */}
+                            <div>
+                              <h3 className={`font-bold mb-2 border-b pb-1 ${isPro ? 'text-gray-300 border-gray-600' : 'text-gray-700 border-gray-200'}`}>🧩 Quiz</h3>
+                              <div className="space-y-4">
+                                {guide.quiz?.map((q: any, i: number) => (
+                                  <div key={i} className="text-sm">
+                                    <p className={`font-bold mb-1 ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
+                                    <div className="pl-2 space-y-1">
+                                      {q.options?.map((opt: string, oi: number) => (
+                                        <div key={oi} className={`${isPro ? 'text-gray-400' : 'text-gray-600'}`}>
+                                          {opt === q.answer ? '✅' : '⚪️'} {opt}
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        ))}
-                      </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ) : isGeneratingGuide ? (
