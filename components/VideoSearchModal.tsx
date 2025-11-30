@@ -81,14 +81,14 @@ export default function VideoSearchModal({ onSelect, onClose, currentSubject = '
         const addedIds = new Set();
 
         roadmapRes.data?.forEach((item: any) => {
-            if (!addedIds.has(item.video_id)) {
+            if (item.video_id && !addedIds.has(item.video_id)) {
                 results.push({ video_id: item.video_id, title: item.title, source: 'Roadmap' });
                 addedIds.add(item.video_id);
             }
         });
 
         libraryRes.data?.forEach((item: any) => {
-            if (!addedIds.has(item.video_id)) {
+            if (item.video_id && !addedIds.has(item.video_id)) {
                 results.push({ video_id: item.video_id, title: item.title, source: 'Library' });
                 addedIds.add(item.video_id);
             }
@@ -96,7 +96,7 @@ export default function VideoSearchModal({ onSelect, onClose, currentSubject = '
 
         // YouTube結果を追加
         (youtubeRes as any[]).forEach((item: any) => {
-            if (!addedIds.has(item.video_id)) {
+            if (item.video_id && !addedIds.has(item.video_id)) {
                 results.push(item);
                 addedIds.add(item.video_id);
             }
