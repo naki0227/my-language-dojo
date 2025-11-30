@@ -1163,40 +1163,6 @@ function HomeContent() {
             {!isAudioOnly && !playError && <button onClick={() => setIsAudioOnly(true)} className="shrink-0 w-full py-2 bg-gray-200 text-xs font-bold text-gray-600 border-b">🙉 Audio Only</button>}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
-              <div className={`rounded-lg shadow p-4 ${isPro ? 'bg-gray-800 border border-gray-700' : 'bg-white'}`}>
-                {/* スマホ用字幕ヘッダー */}
-                <div className="flex justify-between items-center mb-2 relative">
-                  <h2 className="text-sm opacity-50 font-bold">Transcript</h2>
-                  <div className="flex items-center gap-2">
-                    {isTranslating && <span className="text-xs text-blue-500 animate-pulse">Generating...</span>}
-                    <button onClick={() => setIsLangMenuOpen(!isLangMenuOpen)} className="bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
-                      🌐 翻訳 ({selectedLangs.length}) {isLangMenuOpen ? '▲' : '▼'}
-                    </button>
-                  </div>
-                  {isLangMenuOpen && (
-                    <div className="absolute right-0 top-8 bg-white shadow-xl border rounded-xl p-3 z-50 w-48 text-black">
-                      <div className="space-y-1">
-                        {SUPPORTED_LANGUAGES.map(lang => (
-                          <button key={lang.code} onClick={() => toggleLanguage(lang.code)} className={`w-full text-left px-2 py-2 rounded text-sm flex justify-between items-center ${selectedLangs.includes(lang.code) ? 'bg-blue-50 text-blue-600 font-bold' : 'hover:bg-gray-50'}`}>
-                            <span>{lang.label}</span>{selectedLangs.includes(lang.code) && <span>✓</span>}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-                <TranscriptList
-                  isSubtitleLoading={isSubtitleLoading}
-                  subtitles={subtitles}
-                  isPro={isPro}
-                  manualTargetText={manualTargetText}
-                  setManualTargetText={setManualTargetText}
-                  handleSeek={handleSeek}
-                  handleWordClick={handleWordClick}
-                  showTranslation={showTranslation}
-                  selectedLangs={selectedLangs}
-                />
-              </div>
               <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
               {renderStudyGuide()}
               <CommentSection videoId={videoId} />
