@@ -1044,6 +1044,7 @@ function HomeContent() {
 
       {/* サブメニュー */}
       <div className={`shrink-0 w-full flex gap-2 overflow-x-auto p-2 border-b ${isPro ? 'bg-gray-900 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200'}`}>
+        <Link href="/dashboard" className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📊 Dashboard</Link>
         <button onClick={() => setIsSearchOpen(true)} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔍 検索</button>
         <Link href="/vocab" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 単語</Link>
         <Link href="/drill" className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔥 ドリル</Link>
