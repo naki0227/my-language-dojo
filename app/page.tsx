@@ -773,8 +773,19 @@ function HomeContent() {
                     return masterGuide.key_sentences.map((masterItem: any, index: number) => (
                       <div key={index} className={`p-5 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                         {/* Original Sentence */}
-                        <div className="mb-4">
+                        <div className="mb-4 flex justify-between items-start gap-4">
                           <p className={`font-bold text-lg leading-relaxed ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.sentence}</p>
+                          <button
+                            onClick={() => {
+                              setManualTargetText(masterItem.sentence);
+                              // スマホの場合は上部のレコーダーまでスクロールした方が親切かも？
+                              // いったんシンプルにセットのみ
+                            }}
+                            className="shrink-0 bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white px-3 py-1.5 rounded-full shadow-md transition transform hover:scale-105 text-xs font-bold flex items-center gap-1"
+                            title="Shadowing Practice"
+                          >
+                            🎙️ Shadow
+                          </button>
                         </div>
 
                         {/* Explanations per Language (Stacked) */}
