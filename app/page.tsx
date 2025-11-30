@@ -271,6 +271,9 @@ function HomeContent() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [manualTargetText, setManualTargetText] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
+  const [editGoal, setEditGoal] = useState('');
+  const [editLangs, setEditLangs] = useState<string[]>([]);
+  const [editTheme, setEditTheme] = useState<'kids' | 'student' | 'pro'>('student');
 
   // AI翻訳用キャッシュ管理
   const [targetLang, setTargetLang] = useState('ja');
@@ -308,6 +311,9 @@ function HomeContent() {
         // Guest Mode
         setUserId(null);
         setUsername('Guest');
+        setEditName('Guest');
+        setEditGoal('Try the app!');
+        setEditLangs(['Japanese']);
         setUserProfile({
           id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: 'Try the app!', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
         });
@@ -408,6 +414,9 @@ function HomeContent() {
       setUserProfile(profileData as UserProfile);
       setUsername(profileData.username || 'Hero');
       setEditName(profileData.username || 'Hero');
+      setEditGoal(profileData.goal || '');
+      setEditLangs(profileData.study_guide_langs || ['Japanese']);
+      setEditTheme(profileData.theme || 'student');
       if (profileData.placement_test_done === false) setShowPlacementTest(true);
 
       const { data: levelData } = await supabase
@@ -471,33 +480,22 @@ function HomeContent() {
     } catch (e) { alert('レベルの保存に失敗しました'); }
   };
 
-  const handleSaveSettings = async (newTheme: 'kids' | 'student' | 'pro', newGoal: string, newLangs: string[]) => {
+  const handleSaveSettings = async (newTheme: 'kids' | 'student' | 'pro', newGoal: string, newLangs: string[], newName: string) => {
     // Guest Mode: Update local state only
     if (!userId) {
       setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
+      setUsername(newName);
       setIsSettingsOpen(false);
       return;
     }
     try {
-      await supabase.from('profiles').update({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs }).eq('id', userId);
+      await supabase.from('profiles').update({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs, username: newName }).eq('id', userId);
       setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
+      setUsername(newName);
       setIsSettingsOpen(false);
     } catch (e) { alert('設定の保存に失敗しました'); }
   };
-  const handleThemeChange = async (newTheme: any) => {
-    if (!userId) return;
-    await supabase.from('profiles').update({ theme: newTheme }).eq('id', userId);
-    setUserProfile(prev => ({ ...prev, theme: newTheme }));
-  };
-  const handleNameSave = async () => {
-    if (!userId) return;
-    await supabase.from('profiles').update({ username: editName }).eq('id', userId);
-    setUsername(editName); alert('変更しました');
-  };
-  const handleGoalChange = async () => {
-    const newGoal = prompt("目標を入力", userProfile.goal || "");
-    if (newGoal && userId) { await supabase.from('profiles').update({ goal: newGoal }).eq('id', userId); setUserProfile(prev => ({ ...prev, goal: newGoal })); }
-  };
+
 
   const fetchTranslations = async (langsToFetch: string[]) => {
     if (langsToFetch.length === 0) return;
@@ -1023,33 +1021,105 @@ function HomeContent() {
       {/* 設定パネル */}
       {isSettingsOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-xl max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Settings</h2>
+          <div className="bg-white p-6 rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Settings</h2>
+              <button onClick={() => setIsSettingsOpen(false)} className="text-gray-500 hover:text-gray-700 text-2xl">×</button>
+            </div>
 
-            <div className="mb-4">
-              <label className="block text-sm font-bold mb-2">Theme</label>
+            {/* Appearance */}
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Appearance</h3>
               <div className="flex gap-2">
                 {['kids', 'student', 'pro'].map(t => (
-                  <button key={t} onClick={() => handleSaveSettings(t as any, userProfile.goal, userProfile.study_guide_langs || [])} className={`px-3 py-1 rounded border ${userProfile.theme === t ? 'bg-blue-500 text-white' : 'bg-gray-100'}`}>
+                  <button key={t} onClick={() => setEditTheme(t as any)} className={`flex-1 py-2 rounded-lg border font-bold capitalize transition ${editTheme === t ? 'bg-blue-600 text-white border-blue-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
                     {t}
                   </button>
                 ))}
               </div>
             </div>
 
-            {userId && (
-              <button
-                onClick={async () => {
-                  await supabase.auth.signOut();
-                  window.location.reload();
-                }}
-                className="w-full py-2 mb-2 bg-red-100 text-red-600 rounded font-bold hover:bg-red-200 transition"
-              >
-                Logout
-              </button>
-            )}
+            {/* Learning Profile */}
+            <div className="mb-6">
+              <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Learning Profile</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Current Goal</label>
+                  <input
+                    type="text"
+                    value={editGoal}
+                    onChange={(e) => setEditGoal(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                    placeholder="e.g. Master daily conversation"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold mb-2 text-gray-700">Study Guide Languages</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {SUPPORTED_LANGUAGES.map(lang => (
+                      <button
+                        key={lang.code}
+                        onClick={() => {
+                          if (editLangs.includes(lang.dbName)) {
+                            setEditLangs(prev => prev.filter(l => l !== lang.dbName));
+                          } else {
+                            if (editLangs.length < 3) setEditLangs(prev => [...prev, lang.dbName]);
+                          }
+                        }}
+                        className={`p-2 rounded border text-sm text-left flex justify-between items-center transition ${editLangs.includes(lang.dbName) ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        <span>{lang.label}</span>
+                        {editLangs.includes(lang.dbName) && <span>✓</span>}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1">Select up to 3 languages for explanations.</p>
+                </div>
+              </div>
+            </div>
 
-            <button onClick={() => setIsSettingsOpen(false)} className="w-full py-2 bg-gray-200 rounded font-bold">Close</button>
+            {/* Account */}
+            <div className="mb-8">
+              <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Account</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-bold mb-1 text-gray-700">Display Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                  />
+                </div>
+                {userId && (
+                  <button
+                    onClick={async () => {
+                      if (confirm('Are you sure you want to logout?')) {
+                        await supabase.auth.signOut();
+                        window.location.reload();
+                      }
+                    }}
+                    className="w-full py-3 bg-red-50 text-red-600 rounded-lg font-bold hover:bg-red-100 transition flex items-center justify-center gap-2"
+                  >
+                    <span>Log Out</span>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="flex gap-3">
+              <button onClick={() => setIsSettingsOpen(false)} className="flex-1 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200 transition">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleSaveSettings(editTheme, editGoal, editLangs, editName)}
+                className="flex-1 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 shadow-lg hover:shadow-xl transition transform hover:-translate-y-0.5"
+              >
+                Save Changes
+              </button>
+            </div>
           </div>
         </div>
       )}
