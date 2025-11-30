@@ -21,8 +21,11 @@ async function fetchRaw(videoId: string): Promise<any> {
     }
 }
 
+import { verifyAdmin } from '@/lib/admin-auth';
+
 export async function POST(request: Request) {
     try {
+        await verifyAdmin(request);
         const { videoId } = await request.json();
 
         if (!videoId) return NextResponse.json({ error: 'Video ID required' }, { status: 400 });

@@ -7,11 +7,14 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const adminSupabase = createClient(supabaseUrl, supabaseKey);
 
+import { verifyAdmin } from '@/lib/admin-auth';
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120; // Increased to 120s
 
 export async function POST(request: Request) {
     try {
+        await verifyAdmin(request);
         const body = await request.json();
         const { subject, level, type } = body;
 

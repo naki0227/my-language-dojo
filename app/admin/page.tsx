@@ -144,7 +144,11 @@ export default function AdminPage() {
         if (data) { setInquiries(data); setUnreadCount(data.filter((i: any) => !i.is_read).length); }
     };
     const fetchMissingVideos = async () => {
-        const res = await fetch('/api/admin/missing_transcripts');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        const res = await fetch('/api/admin/missing_transcripts', {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
         const data = await res.json();
         if (data.videos) {
             setMissingVideos(data.videos);
@@ -192,10 +196,12 @@ export default function AdminPage() {
         setIsGenerating(true);
         setFoundVideos([]);
         setFinderMessage('');
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
         try {
             const res = await fetch('/api/admin/find_video', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ mode: finderMode, value: finderInput, subject: currentAdminSubject })
             });
             const data = await res.json();
@@ -246,9 +252,11 @@ export default function AdminPage() {
                         const label = `${sub} [${lvl}] ${type} (${i + 1}/${factoryCount})`;
                         setFactoryLogs(prev => [`⏳ Generating: ${label}...`, ...prev]);
                         try {
+                            const { data: { session } } = await supabase.auth.getSession();
+                            if (!session) throw new Error('No session');
                             const res = await fetch('/api/admin/generate_single_content', {
                                 method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
+                                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                                 body: JSON.stringify({ subject: sub, level: lvl, type: type })
                             });
                             if (res.ok) {
@@ -362,9 +370,12 @@ export default function AdminPage() {
                 transcriptText = rawJsonInput;
             }
 
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) throw new Error('No session');
+
             const res = await fetch('/api/admin/generate_study_guide', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({
                     videoId: importVideoId,
                     transcript: transcriptText,
@@ -400,8 +411,10 @@ export default function AdminPage() {
     const handleGenerateRoadmap = async () => {
         setIsGenerating(true);
         try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
             const res = await fetch('/api/admin/roadmap', {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ level: roadmapLevel, keywords: roadmapQuery, targetSubject: currentAdminSubject }),
             });
             const data = await res.json();
@@ -477,9 +490,11 @@ export default function AdminPage() {
                 setTestLogs(prev => [`⏳ [${sub}] Batch ${i + 1}/${batches}: Generating ${currentBatchSize} questions...`, ...prev]);
 
                 try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (!session) throw new Error('No session');
                     const res = await fetch('/api/admin/generate_questions', {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                         body: JSON.stringify({ subject: sub, level: testLevel, count: currentBatchSize })
                     });
                     const data = await res.json();
@@ -501,7 +516,13 @@ export default function AdminPage() {
         try {
             const endpoint = step === 1 ? '/api/admin/full_setup' : '/api/ai/textbook_bulk';
             const body = { subject: currentAdminSubject };
-            const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), });
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session) return;
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
+                body: JSON.stringify(body),
+            });
             const data = await res.json();
             if (!res.ok || data.error) throw new Error(data.error || 'API Error');
             if (step === 1) { alert(`ステップ1完了`); setSetupStep(2); } else if (step === 2) { alert(`ステップ2完了`); setSetupStep(3); }

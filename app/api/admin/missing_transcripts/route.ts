@@ -8,8 +8,11 @@ const adminSupabase = createClient(
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+import { verifyAdmin } from '@/lib/admin-auth';
+
+export async function GET(request: Request) {
     try {
+        await verifyAdmin(request);
         // 1. 登録済みの全動画IDを取得 (ロードマップとライブラリ)
         const { data: roadmapVideos } = await adminSupabase.from('roadmap_items').select('video_id, title, subject');
         const { data: libraryVideos } = await adminSupabase.from('library_videos').select('video_id, title');

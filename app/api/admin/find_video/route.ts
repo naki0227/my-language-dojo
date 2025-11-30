@@ -5,8 +5,11 @@ import { Innertube, UniversalCache } from 'youtubei.js';
 
 export const dynamic = 'force-dynamic';
 
+import { verifyAdmin } from '@/lib/admin-auth';
+
 export async function POST(request: Request) {
     try {
+        await verifyAdmin(request);
         const { mode, value, subject } = await request.json(); // mode: 'id' | 'keyword' | 'auto'
         const targetSubject = subject || 'English';
 

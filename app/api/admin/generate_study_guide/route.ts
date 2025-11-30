@@ -7,11 +7,14 @@ const adminSupabase = createClient(
     process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+import { verifyAdmin } from '@/lib/admin-auth';
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 export async function POST(request: Request) {
     try {
+        await verifyAdmin(request);
         const { videoId, transcript, subject } = await request.json();
 
         if (!videoId || !transcript) {

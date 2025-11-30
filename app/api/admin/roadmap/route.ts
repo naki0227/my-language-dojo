@@ -8,11 +8,14 @@ const adminSupabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+import { verifyAdmin } from '@/lib/admin-auth';
+
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
     try {
+        await verifyAdmin(request);
         const { level, keywords, targetSubject } = await request.json();
         const query = keywords || `${targetSubject || 'English'} learning ${level}`;
 
