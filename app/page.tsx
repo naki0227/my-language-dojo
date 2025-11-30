@@ -1037,6 +1037,18 @@ function HomeContent() {
               </div>
             </div>
 
+            {userId && (
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  window.location.reload();
+                }}
+                className="w-full py-2 mb-2 bg-red-100 text-red-600 rounded font-bold hover:bg-red-200 transition"
+              >
+                Logout
+              </button>
+            )}
+
             <button onClick={() => setIsSettingsOpen(false)} className="w-full py-2 bg-gray-200 rounded font-bold">Close</button>
           </div>
         </div>
