@@ -30,6 +30,7 @@ const SUBJECT_TO_BCP47: Record<string, string> = {
     'Russian': 'ru-RU',
     'German': 'de-DE',
     'Italian': 'it-IT',
+    'Indonesian': 'id-ID'
 };
 
 // Japanese character detection regex

@@ -16,7 +16,7 @@ type Vocab = {
     subject: string;
 };
 
-const SUBJECTS = ['English', 'Spanish', 'French', 'Chinese', 'Korean', 'Portuguese', 'Arabic', 'Russian', 'Programming', 'Sign Language'];
+const SUBJECTS = ['English', 'Spanish', 'French', 'Chinese', 'Korean', 'Portuguese', 'Arabic', 'Russian', 'Indonesian', 'Programming', 'Sign Language'];
 
 export default function VocabPage() {
     const router = useRouter();

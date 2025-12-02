@@ -13,7 +13,7 @@ type Textbook = {
     level: string; // ★追加
 };
 
-const SUBJECTS = ['English', 'Spanish', 'French', 'Chinese', 'Korean', 'Portuguese', 'Arabic', 'Russian', 'Programming', 'Sign Language'];
+const SUBJECTS = ['English', 'Spanish', 'French', 'Chinese', 'Korean', 'Portuguese', 'Arabic', 'Russian', 'German', 'Italian', 'Indonesian', 'Programming', 'Sign Language'];
 const LEVELS = ['ALL', 'A1', 'A2', 'B1', 'B2', 'C1', 'C2'];
 
 export default function TextbookList() {

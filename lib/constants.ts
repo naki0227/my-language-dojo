@@ -13,6 +13,7 @@ export const SUPPORTED_LANGUAGES = [
     { code: 'ru', label: '🇷🇺 Russian', dbName: 'Russian' },
     { code: 'de', label: '🇩🇪 German', dbName: 'German' },
     { code: 'it', label: '🇮🇹 Italian', dbName: 'Italian' },
+    { code: 'id', label: '🇮🇩 Indonesian', dbName: 'Indonesian' },
 ];
 
 // 2. 管理画面などで使う「科目」のリスト

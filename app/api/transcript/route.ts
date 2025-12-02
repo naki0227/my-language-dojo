@@ -15,7 +15,7 @@ export const maxDuration = 60;
 
 const LANG_MAP: Record<string, string> = {
     ja: 'Japanese', en: 'English', zh: 'Chinese (Simplified)', ko: 'Korean',
-    pt: 'Portuguese', ar: 'Arabic', ru: 'Russian', es: 'Spanish', fr: 'French',
+    pt: 'Portuguese', ar: 'Arabic', ru: 'Russian', es: 'Spanish', fr: 'French', de: 'German', it: 'Italian', id: 'Indonesian',
 };
 
 // デモ動画用バックアップ (通信エラー時の保険)

@@ -30,6 +30,10 @@ SUBJECT_TO_LANG_CODES = {
     'Japanese': ['ja'],
     'Korean': ['ko'],
     'Chinese': ['zh', 'zh-Hans', 'zh-Hant', 'zh-CN', 'zh-TW'],
+    'Portuguese': ['pt', 'pt-BR', 'pt-PT'],
+    'Arabic': ['ar', 'ar-SA', 'ar-EG'],
+    'Russian': ['ru', 'ru-RU'], 
+    'Indonesian': ['id', 'id-ID'],
 }
 
 def get_expected_languages():
