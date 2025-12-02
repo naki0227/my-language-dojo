@@ -13,6 +13,7 @@ import Heatmap from '@/components/Heatmap';
 import PlacementTest from '@/components/PlacementTest';
 import AIChatButton from '@/components/AIChatButton';
 import VideoSearchModal from '@/components/VideoSearchModal';
+import LoginRequiredModal from '@/components/LoginRequiredModal';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
 import { ExternalLink, AlertCircle, HelpCircle } from 'lucide-react';
 
@@ -286,6 +287,7 @@ function HomeContent() {
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const loadedVideoIdRef = useRef<string | null>(null);
 
@@ -576,7 +578,11 @@ function HomeContent() {
   };
 
   const handleSaveToLibrary = async () => {
-    if (!userId || subtitles.length === 0) return;
+    if (!userId) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    if (subtitles.length === 0) return;
     if (!confirm('ライブラリに登録しますか？')) return;
     setIsRegistering(true);
     try {
@@ -596,6 +602,10 @@ function HomeContent() {
     const cleanWord = word.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()]/g, "").toLowerCase();
 
     if (userProfile.learning_target !== 'English') {
+      if (!userId) {
+        setIsLoginModalOpen(true);
+        return;
+      }
       setSelectedWord(cleanWord); setDictData(null); setIsLoading(true);
       try {
         const aiRes = await fetch('/api/ai/analyze', {
@@ -632,7 +642,11 @@ function HomeContent() {
   };
 
   const handleSaveWord = async () => {
-    if (!userId || !dictData) return;
+    if (!userId) {
+      setIsLoginModalOpen(true);
+      return;
+    }
+    if (!dictData) return;
     setIsSaving(true);
     try {
       await supabase.from('vocab').insert([{ user_id: userId, word: dictData.word, translation: dictData.translation || 'なし', subject: userProfile.learning_target }]);
@@ -644,6 +658,10 @@ function HomeContent() {
 
 
   const handleCheckSummary = async () => {
+    if (!userId) {
+      setIsLoginModalOpen(true);
+      return;
+    }
     if (!userSummary.trim()) return;
     setIsCheckingSummary(true);
     try {
@@ -1243,11 +1261,13 @@ function HomeContent() {
       <div className={`shrink-0 w-full p-4 border-t text-center text-xs text-gray-400 ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
         <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Information Student</a>.</p>
       </div>
+      <LoginRequiredModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
     </main>
   );
 }
-
-
 
 export default function Home() {
   return (
