@@ -285,6 +285,7 @@ function HomeContent() {
   // ★画面サイズ判定用
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const loadedVideoIdRef = useRef<string | null>(null);
 
@@ -307,26 +308,29 @@ function HomeContent() {
 
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setUserId(session.user.id);
-        setUserEmail(session.user.email || null);
-        fetchProfile(session.user.id);
-      } else {
-        // Guest Mode
-        setUserId(null);
-        setUserEmail(null);
-        setUsername('Guest');
-        setEditName('Guest');
-        setEditGoal('Try the app!');
-        setEditLangs(['Japanese']);
-        setUserProfile({
-          id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: 'Try the app!', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
-        });
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setUserId(session.user.id);
+          setUserEmail(session.user.email || null);
+          await fetchProfile(session.user.id);
+        } else {
+          // Guest Mode
+          setUserId(null);
+          setUserEmail(null);
+          setUsername('Guest');
+          setEditName('Guest');
+          setEditGoal('Try the app!');
+          setEditLangs(['Japanese']);
+          setUserProfile({
+            id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: 'Try the app!', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
+          });
+        }
+      } catch (e) {
+        console.error("Session check error:", e);
+      } finally {
+        setIsAuthLoading(false);
       }
-      setUserId(session.user.id);
-      fetchProfile(session.user.id);
     };
     checkSession();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -663,7 +667,7 @@ function HomeContent() {
     }
   };
 
-  if (!userId || !mounted) return <div className="p-10 text-center">Loading...</div>;
+  if (isAuthLoading || !mounted) return <div className="p-10 text-center">Loading...</div>;
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
 
