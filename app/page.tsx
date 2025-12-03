@@ -689,22 +689,13 @@ function HomeContent() {
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
 
-  // コンポーネント: 字幕リスト
-
-
-
-
-
-
-
-
   const playAudio = () => dictData?.audio && new Audio(dictData.audio).play();
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
 
   const renderStudyGuide = () => (
-    <div className={`${isMobile ? 'w-full h-auto mt-6' : 'w-1/3 h-full'} rounded-lg shadow-lg border flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'}`}>
-      {/* PC用ヘッダー */}
-      <div className="p-4 border-b flex justify-between items-start relative border-gray-700">
+    <div className={`${isMobile ? 'w-full h-auto mt-6' : 'w-full h-full'} flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white/50 border-white/50'}`}>
+      {/* Header */}
+      <div className="p-4 border-b flex justify-between items-start relative border-gray-200/50">
         <div>
           <h2 className="text-sm font-bold opacity-70 mb-1">Study Guide</h2>
           <p className="text-xs opacity-50">Langs (Max 3):</p>
@@ -724,7 +715,7 @@ function HomeContent() {
                   }
                   loadVideo(videoId, newLangs);
                 }}
-                className={`w-6 h-6 flex items-center justify-center rounded text-xs transition ${isSelected ? 'bg-indigo-600 ring-1 ring-indigo-400 grayscale-0' : 'bg-gray-700 grayscale opacity-50 hover:opacity-100'}`}
+                className={`w-6 h-6 flex items-center justify-center rounded text-xs transition ${isSelected ? 'bg-indigo-600 ring-1 ring-indigo-400 grayscale-0 text-white' : 'bg-gray-200 grayscale opacity-50 hover:opacity-100'}`}
                 title={lang.label}
               >
                 {lang.label.split(' ')[0]}
