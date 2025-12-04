@@ -207,9 +207,16 @@ function HomeContent() {
 
         // Auto-generate
         console.log(`No study guide found for ${lang}. Auto-generating...`);
+
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+
         const genRes = await fetch(getApiUrl('/api/study_guide/generate'), {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: lang })
         });
         console.log(`[Frontend] API Status (${lang}): ${genRes.status}`);
