@@ -16,34 +16,17 @@ import VideoSearchModal from '@/components/VideoSearchModal';
 import LoginRequiredModal from '@/components/LoginRequiredModal';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
 import {
-  ExternalLink, AlertCircle, HelpCircle,
   LayoutDashboard, Search, BookOpen, Flame, Library,
   MessageCircle, PenTool, Headphones, Settings, LogIn,
   Globe, Mic, CheckCircle, Lightbulb
 } from 'lucide-react';
+import { VideoPlayerArea } from '@/components/VideoPlayerArea';
+import { StudyGuide } from '@/components/StudyGuide';
+import { Subtitle, DictionaryData, UserLevelData, UserProfile } from '@/types';
 
 // --- 型定義 ---
-type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
-type DictionaryData = {
-  word: string; phonetic?: string; audio?: string; translation?: string;
-  sourceLang?: string;
-  meanings?: { partOfSpeech: string; definitions: { definition: string }[]; }[];
-};
-type UserLevelData = {
-  user_id: string;
-  subject: string;
-  level_result: string;
-  score: number;
-  xp: number;
-};
-type UserProfile = {
-  id: string; level: number; xp: number; next_level_xp: number;
-  theme: 'kids' | 'student' | 'pro';
-  goal: string;
-  placement_test_done: boolean;
-  learning_target: string;
-  study_guide_langs: string[]; // Added
-};
+// --- 型定義 ---
+// Moved to @/types/index.ts
 
 const CEFR_LEVELS = [
   'A1 (Beginner)', 'A2 (Elementary)', 'B1 (Intermediate)', 'B2 (Upper Intermediate)',
@@ -52,142 +35,9 @@ const CEFR_LEVELS = [
 
 const XP_CAP = 1000;
 
-interface PlayerAreaProps {
-  videoId: string;
-  isAudioOnly: boolean;
-  setIsAudioOnly: (value: boolean) => void;
-  playError: boolean;
-  setPlayError: (value: boolean) => void;
-  onPlayerReady: (player: any) => void;
-}
+// PlayerArea moved to @/components/VideoPlayerArea.tsx
 
-const PlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playError, setPlayError, onPlayerReady }: PlayerAreaProps) => {
-  const playerRef = useRef<any | null>(null);
-
-  useEffect(() => {
-    if (playError || isAudioOnly) return;
-
-    const initPlayer = () => {
-      if ((window as any).YT && (window as any).YT.Player) {
-        try {
-          if (playerRef.current) {
-            try { playerRef.current.destroy(); } catch (e) { console.error(e); }
-          }
-
-          playerRef.current = new (window as any).YT.Player('youtube-player', {
-            events: {
-              'onReady': (e: any) => onPlayerReady(e.target),
-              'onError': (e: any) => {
-                console.warn("YouTube Player Error:", e.data);
-                setPlayError(true);
-              }
-            }
-          });
-        } catch (e) {
-          console.error("Player init error", e);
-        }
-      }
-    };
-
-    if (!(window as any).YT) {
-      const tag = document.createElement('script');
-      tag.src = "https://www.youtube.com/iframe_api";
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag?.parentNode?.insertBefore(tag, firstScriptTag);
-      (window as any).onYouTubeIframeAPIReady = initPlayer;
-    } else {
-      initPlayer();
-    }
-
-    return () => {
-      if (playerRef.current) {
-        try { playerRef.current.destroy(); } catch (e) { console.error(e); }
-      }
-    };
-  }, [videoId, playError, isAudioOnly, onPlayerReady, setPlayError]);
-
-  return (
-    <div className={`relative aspect-video rounded-lg overflow-hidden shadow-xl bg-black ${isAudioOnly ? 'h-12' : ''} relative group`}>
-      {playError ? (
-        <div className="w-full h-full flex flex-col items-center justify-center bg-gray-900 text-white p-4 text-center z-10">
-          <AlertCircle className="w-12 h-12 text-red-500 mb-3" />
-          <h3 className="text-xl font-bold mb-2">埋め込み再生できません</h3>
-          <p className="text-sm text-gray-400 mb-6">YouTube公式で視聴してください。</p>
-          <a href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noopener noreferrer" className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 rounded-full font-bold shadow-lg flex items-center gap-2 transition transform hover:scale-105">
-            <ExternalLink size={20} /> YouTubeで開く
-          </a>
-        </div>
-      ) : isAudioOnly ? (
-        <div className="w-full h-full flex items-center justify-center text-white text-xs cursor-pointer" onClick={() => setIsAudioOnly(false)}>🙈 Audio Only (Tap)</div>
-      ) : (
-        <iframe
-          id="youtube-player"
-          width="100%"
-          height="100%"
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1`}
-          title="YouTube video player"
-          frameBorder="0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          allowFullScreen
-          className="w-full h-full"
-        />
-      )}
-
-      {!playError && !isAudioOnly && (
-        <button
-          onClick={() => setPlayError(true)}
-          className="absolute top-2 right-2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full z-20 backdrop-blur-sm transition opacity-70 hover:opacity-100"
-          title="動画が再生できない場合はこちら (YouTubeで開く)"
-        >
-          <HelpCircle size={24} />
-        </button>
-      )}
-    </div>
-  );
-};
-
-interface TranscriptListProps {
-  isSubtitleLoading: boolean;
-  subtitles: Subtitle[];
-  isPro: boolean;
-  manualTargetText: string | null;
-  setManualTargetText: (text: string | null) => void;
-  handleSeek: (ms: number) => void;
-  handleWordClick: (word: string, e: React.MouseEvent) => void;
-  showTranslation: boolean;
-  selectedLangs: string[];
-}
-
-const TranscriptList = ({
-  isSubtitleLoading,
-  subtitles,
-  isPro,
-  manualTargetText,
-  setManualTargetText,
-  handleSeek,
-  handleWordClick,
-  showTranslation,
-  selectedLangs
-}: TranscriptListProps) => (
-  <div className="space-y-3">
-    {isSubtitleLoading ? (
-      <div className="text-center py-10 text-gray-500 animate-pulse">字幕データを取得中...</div>
-    ) : subtitles.length > 0 ? (
-      subtitles.map((sub, i) => (
-        <div key={i} onClick={() => { handleSeek(sub.offset); setManualTargetText(sub.text); }} className={`cursor-pointer p-3 rounded text-base leading-relaxed transition-colors border-b ${isPro ? 'border-gray-700 hover:bg-gray-700 text-gray-300' : 'border-gray-50 hover:bg-gray-100 text-gray-700'} ${manualTargetText === sub.text ? (isPro ? 'bg-gray-700 border-l-4 border-green-500' : 'bg-green-50 border-l-4 border-green-500') : ''}`}>
-          <div className="mb-1">{(sub.text || '').split(' ').map((word, wIndex) => (<span key={wIndex} onClick={(e) => handleWordClick(word, e)} className={`inline-block mx-0.5 px-0.5 rounded ${word.length >= 6 ? 'text-blue-500 font-bold' : ''}`}>{word}</span>))}</div>
-          {showTranslation && sub.translation && (<div className="mt-1 text-sm text-blue-600 font-bold">{sub.translation}</div>)}
-          {selectedLangs.map(lang => (sub.translations && sub.translations[lang] ? (<div key={lang} className="text-sm text-gray-500 mt-1 border-l-2 border-blue-200 pl-2"><span className="text-xs font-bold text-blue-400 mr-1">{lang.toUpperCase()}:</span>{sub.translations[lang]}</div>) : null))}
-        </div>
-      ))
-    ) : (
-      <div className="text-center py-10 opacity-60">
-        <p className="mb-2 font-bold">字幕データがありません</p>
-        <p className="text-xs">Adminで生成されているか確認してください。</p>
-      </div>
-    )}
-  </div>
-);
+// TranscriptList moved to @/components/TranscriptList.tsx
 
 function HomeContent() {
   const router = useRouter();
@@ -697,310 +547,7 @@ function HomeContent() {
   const playAudio = () => dictData?.audio && new Audio(dictData.audio).play();
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
 
-  const renderStudyGuide = () => (
-    <div className={`${isMobile ? 'w-full h-auto mt-6' : 'w-[450px] h-full shrink-0'} flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white/50 border-white/50'}`}>
-      {/* Header */}
-      <div className="p-4 border-b flex justify-between items-start relative border-gray-200/50">
-        <div>
-          <h2 className="text-sm font-bold opacity-70 mb-1">Study Guide</h2>
-          <p className="text-xs opacity-50">Langs (Max 3):</p>
-        </div>
-        <div className="grid grid-cols-6 gap-1">
-          {SUPPORTED_LANGUAGES.map(lang => {
-            const isSelected = explanationLangs.includes(lang.dbName);
-            return (
-              <button
-                key={lang.code}
-                onClick={() => {
-                  let newLangs = [...explanationLangs];
-                  if (isSelected) {
-                    if (newLangs.length > 1) newLangs = newLangs.filter(l => l !== lang.dbName);
-                  } else {
-                    if (newLangs.length < 3) newLangs.push(lang.dbName);
-                  }
-                  loadVideo(videoId, newLangs);
-                }}
-                className={`w-6 h-6 flex items-center justify-center rounded text-xs transition ${isSelected ? 'bg-indigo-600 ring-1 ring-indigo-400 grayscale-0 text-white' : 'bg-gray-200 grayscale opacity-50 hover:opacity-100'}`}
-                title={lang.label}
-              >
-                {lang.label.split(' ')[0]}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <div className={`${isMobile ? '' : 'flex-1 overflow-y-auto'} p-4`}>
-        {Object.keys(studyGuides).length > 0 ? (
-          <div className="space-y-6">
-            {/* Summary Challenge (Shared) */}
-            <div className={`p-4 rounded-lg border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-indigo-50 border-indigo-100'}`}>
-              <h3 className={`font-bold mb-2 ${isPro ? 'text-indigo-300' : 'text-indigo-700'}`}>📝 Summary Challenge</h3>
 
-              {!showModelSummary ? (
-                <div className="space-y-3">
-                  <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>
-                    Watch the video and write a 3-sentence summary!
-                  </p>
-                  <textarea
-                    value={userSummary}
-                    onChange={(e) => setUserSummary(e.target.value)}
-                    className={`w-full p-3 rounded border text-sm ${isPro ? 'bg-gray-900 border-gray-700 text-white' : 'bg-white border-gray-300 text-black'}`}
-                    rows={3}
-                    placeholder="Type your summary here..."
-                  />
-                  <button
-                    onClick={handleCheckSummary}
-                    disabled={isCheckingSummary || !userSummary.trim()}
-                    className={`w-full py-2 rounded font-bold text-white transition ${isCheckingSummary ? 'bg-gray-600' : 'bg-indigo-600 hover:bg-indigo-500'}`}
-                  >
-                    {isCheckingSummary ? 'Analyzing...' : 'Check My Summary'}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-4 animate-fade-in">
-                  <div className={`p-3 rounded border ${isPro ? 'bg-gray-900 border-gray-700' : 'bg-white border-gray-200'}`}>
-                    <p className="text-xs font-bold opacity-50 mb-1">Your Summary</p>
-                    <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-800'}`}>{userSummary}</p>
-                  </div>
-
-                  <div className={`p-3 rounded border border-l-4 ${isPro ? 'bg-blue-900/30 border-blue-500' : 'bg-blue-50 border-blue-500'}`}>
-                    <p className="text-xs font-bold text-blue-500 mb-1">AI Feedback</p>
-                    <p className={`text-sm ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{summaryFeedback}</p>
-                  </div>
-
-                  <div className="border-t border-gray-700 pt-3">
-                    <p className="text-xs font-bold opacity-50 mb-2">Model Answers</p>
-                    <div className="space-y-2">
-                      {explanationLangs.map(lang => studyGuides[lang] && (
-                        <div key={lang} className={`p-3 rounded border ${isPro ? 'bg-cyan-900/40 border-cyan-800' : 'bg-white border-gray-200'}`}>
-                          <p className="text-xs font-bold mb-1 opacity-70 text-cyan-400">{lang}</p>
-                          <p className={`text-sm leading-relaxed ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{studyGuides[lang].summary}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => setShowModelSummary(false)}
-                    className="text-xs text-gray-500 underline hover:text-gray-700"
-                  >
-                    Try Again
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Grouped by Section Content */}
-            <div className="space-y-8">
-
-              {/* Key Sentences Section */}
-              <div>
-                <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${isPro ? 'text-yellow-400' : 'text-indigo-700'}`}>
-                  🔑 Key Sentences
-                </h3>
-                <div className="space-y-6">
-                  {(() => {
-                    const masterLang = explanationLangs.find(l => studyGuides[l]);
-                    const masterGuide = masterLang ? studyGuides[masterLang] : null;
-
-                    if (!masterGuide?.key_sentences) return <p className="text-sm opacity-50">No key sentences found.</p>;
-
-                    return masterGuide.key_sentences.map((masterItem: any, index: number) => (
-                      <div key={index} className={`p-5 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                        {/* Original Sentence */}
-                        <div className="mb-4 flex justify-between items-start gap-4">
-                          <p className={`font-bold text-lg leading-relaxed ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.sentence}</p>
-                          <button
-                            onClick={() => {
-                              setManualTargetText(masterItem.sentence);
-                              // スマホの場合は上部のレコーダーまでスクロールした方が親切かも？
-                              // いったんシンプルにセットのみ
-                            }}
-                            className="shrink-0 bg-gradient-to-r from-pink-500 to-red-500 hover:from-pink-600 hover:to-red-600 text-white px-3 py-1.5 rounded-full shadow-md transition transform hover:scale-105 text-xs font-bold flex items-center gap-1"
-                            title="Shadowing Practice"
-                          >
-                            🎙️ Shadow
-                          </button>
-                        </div>
-
-                        {/* Explanations per Language (Stacked) */}
-                        <div className="flex flex-col gap-2">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            const item = guide?.key_sentences?.[index] || guide?.key_sentences?.find((s: any) => s.sentence === masterItem.sentence);
-
-                            if (!item) return null;
-
-                            return (
-                              <div key={lang} className={`p-3 rounded-lg border-l-4 ${isPro ? 'bg-cyan-900/30 border-cyan-600' : 'bg-gray-50 border-indigo-400'}`}>
-                                <div className="flex justify-between items-center mb-1">
-                                  <span className={`text-xs font-bold ${isPro ? 'text-cyan-400' : 'text-indigo-600'}`}>{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}</span>
-                                </div>
-                                <p className={`text-sm mb-2 ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{item.translation}</p>
-                                <p className={`text-xs ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>💡 {item.explanation}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-
-              {/* Vocabulary Section */}
-              <div>
-                <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${isPro ? 'text-green-400' : 'text-indigo-700'}`}>
-                  📚 Vocabulary
-                </h3>
-                <div className="space-y-4">
-                  {(() => {
-                    const masterLang = explanationLangs.find(l => studyGuides[l]);
-                    const masterGuide = masterLang ? studyGuides[masterLang] : null;
-
-                    if (!masterGuide?.vocabulary) return <p className="text-sm opacity-50">No vocabulary found.</p>;
-
-                    return masterGuide.vocabulary.map((masterItem: any, index: number) => (
-                      <div key={index} className={`p-4 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                        <div className="flex justify-between items-start mb-3">
-                          <p className={`font-bold text-lg ${isPro ? 'text-white' : 'text-gray-900'}`}>{masterItem.word}</p>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (!userId) {
-                                alert("Please login to save vocabulary!");
-                                return;
-                              }
-                              setDictData({ word: masterItem.word, translation: masterItem.meaning, sourceLang: userProfile.learning_target });
-                              const save = async () => {
-                                if (!userId) return;
-                                try {
-                                  await supabase.from('vocab').insert([{ user_id: userId, word: masterItem.word, translation: masterItem.meaning, subject: userProfile.learning_target }]);
-                                  await addXp(10); alert(`Saved: ${masterItem.word} (+10 XP)`);
-                                } catch { alert('Save failed'); }
-                              };
-                              save();
-                            }}
-                            className={`text-xs px-2 py-1 rounded transition ${userId ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
-                          >
-                            {userId ? '＋ Save' : '🔒 Save'}
-                          </button>
-                        </div>
-
-                        <div className="flex flex-col gap-2">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            const item = guide?.vocabulary?.[index] || guide?.vocabulary?.find((v: any) => v.word === masterItem.word);
-
-                            if (!item) return null;
-
-                            return (
-                              <div key={lang} className={`p-2 rounded border-l-4 ${isPro ? 'bg-gray-700/50 border-gray-500' : 'bg-gray-50 border-gray-300'}`}>
-                                <div className="flex items-center gap-2">
-                                  <span className={`text-xs font-bold ${isPro ? 'text-gray-400' : 'text-gray-500'}`}>{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label.split(' ')[0]}</span>
-                                  <span className={`text-sm ${isPro ? 'text-gray-200' : 'text-gray-700'}`}>{item.meaning}</span>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-
-              {/* Grammar Section */}
-              <div>
-                <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${isPro ? 'text-pink-400' : 'text-indigo-700'}`}>
-                  📐 Grammar
-                </h3>
-                <div className="space-y-4">
-                  {(() => {
-                    const masterLang = explanationLangs.find(l => studyGuides[l]);
-                    const masterGuide = masterLang ? studyGuides[masterLang] : null;
-
-                    if (!masterGuide?.grammar) return <p className="text-sm opacity-50">No grammar points found.</p>;
-
-                    return masterGuide.grammar.map((masterItem: any, index: number) => (
-                      <div key={index} className={`p-4 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                        <p className={`font-bold text-lg mb-3 ${isPro ? 'text-pink-300' : 'text-pink-700'}`}>{masterItem.point}</p>
-
-                        <div className="flex flex-col gap-2">
-                          {explanationLangs.map(lang => {
-                            const guide = studyGuides[lang];
-                            const item = guide?.grammar?.[index] || guide?.grammar?.find((g: any) => g.point === masterItem.point);
-
-                            if (!item) return null;
-
-                            return (
-                              <div key={lang} className={`p-3 rounded border-l-4 ${isPro ? 'bg-pink-900/20 border-pink-600' : 'bg-pink-50 border-pink-300'}`}>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <span className={`text-xs font-bold ${isPro ? 'text-pink-400' : 'text-pink-600'}`}>{SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}</span>
-                                </div>
-                                <p className={`text-sm ${isPro ? 'text-gray-300' : 'text-gray-600'}`}>{item.explanation}</p>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ));
-                  })()}
-                </div>
-              </div>
-
-              {/* Quiz Section */}
-              <div>
-                <h3 className={`font-bold text-lg mb-4 flex items-center gap-2 ${isPro ? 'text-orange-400' : 'text-indigo-700'}`}>
-                  🧩 Quiz
-                </h3>
-                <div className="grid grid-cols-1 gap-6">
-                  {explanationLangs.map(lang => {
-                    const guide = studyGuides[lang];
-                    if (!guide?.quiz) return null;
-                    return (
-                      <div key={lang} className={`p-4 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
-                        <h4 className="font-bold text-sm mb-4 opacity-70 flex items-center gap-2 border-b border-gray-700 pb-2">
-                          {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
-                        </h4>
-                        <div className="space-y-6">
-                          {guide.quiz.map((q: any, i: number) => (
-                            <div key={i} className="text-sm">
-                              <p className={`font-bold mb-2 text-base ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
-                              <div className="pl-2 space-y-2">
-                                {q.options?.map((opt: string, oi: number) => (
-                                  <div key={oi} className={`p-2 rounded border ${isPro ? 'border-gray-700 bg-gray-900/50 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
-                                    {opt === q.answer ? '✅' : '⚪️'} {opt}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-            </div>
-          </div >
-        ) : isGeneratingGuide ? (
-          <div className="text-center py-10 animate-pulse">
-            <p className="text-2xl mb-2">🤖</p>
-            <p className="font-bold text-indigo-600">Generating Study Guide...</p>
-            <p className="text-xs text-gray-500">AI is analyzing the video content for you.</p>
-          </div>
-        ) : (
-          <div className="text-center py-10 opacity-60">
-            <p className="mb-2 font-bold">Study Guide Not Found</p>
-            <p className="text-xs">Could not generate guide for this video.</p>
-          </div>
-        )
-        }
-      </div >
-    </div >
-  );
 
   return (
     <main className={`h-screen flex flex-col transition-colors duration-500 ${getThemeStyles()} overflow-hidden relative`}>
@@ -1201,12 +748,32 @@ function HomeContent() {
         {/* スマホビュー */}
         {isMobile && (
           <div className="flex flex-col h-full w-full">
-            <PlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
+            <VideoPlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
             {!isAudioOnly && !playError && <button onClick={() => setIsAudioOnly(true)} className="shrink-0 w-full py-2 bg-gray-200 text-xs font-bold text-gray-600 border-b">🙉 Audio Only</button>}
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
               <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
-              {renderStudyGuide()}
+              <StudyGuide
+                isMobile={isMobile}
+                isPro={isPro}
+                explanationLangs={explanationLangs}
+                studyGuides={studyGuides}
+                isGeneratingGuide={isGeneratingGuide}
+                userSummary={userSummary}
+                setUserSummary={setUserSummary}
+                handleCheckSummary={handleCheckSummary}
+                isCheckingSummary={isCheckingSummary}
+                showModelSummary={showModelSummary}
+                setShowModelSummary={setShowModelSummary}
+                summaryFeedback={summaryFeedback}
+                videoId={videoId}
+                loadVideo={loadVideo}
+                setManualTargetText={setManualTargetText}
+                userId={userId}
+                userProfile={userProfile}
+                setDictData={setDictData}
+                addXp={addXp}
+              />
               <CommentSection videoId={videoId} />
             </div>
           </div>
@@ -1224,7 +791,7 @@ function HomeContent() {
                   <Link href="/auth" className="inline-block bg-blue-600 text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-blue-700 transition">Login / Sign Up</Link>
                 </div>
               )}
-              <PlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
+              <VideoPlayerArea videoId={videoId} isAudioOnly={isAudioOnly} setIsAudioOnly={setIsAudioOnly} playError={playError} setPlayError={setPlayError} onPlayerReady={onReady} />
               <button onClick={() => setIsAudioOnly(!isAudioOnly)} className="w-full py-2 bg-gray-200 text-sm font-bold rounded">Switch to Audio Only</button>
               <div className={`${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white'} rounded-xl shadow-sm border overflow-hidden`}>
                 <VoiceRecorder targetText={manualTargetText || subtitles.find(s => { const start = s.offset / 1000; const end = start + (s.duration / 1000); return currentTime >= start && currentTime < end; })?.text || ""} />
@@ -1232,7 +799,27 @@ function HomeContent() {
               <CommentSection videoId={videoId} />
             </div>
 
-            {renderStudyGuide()}
+            <StudyGuide
+              isMobile={isMobile}
+              isPro={isPro}
+              explanationLangs={explanationLangs}
+              studyGuides={studyGuides}
+              isGeneratingGuide={isGeneratingGuide}
+              userSummary={userSummary}
+              setUserSummary={setUserSummary}
+              handleCheckSummary={handleCheckSummary}
+              isCheckingSummary={isCheckingSummary}
+              showModelSummary={showModelSummary}
+              setShowModelSummary={setShowModelSummary}
+              summaryFeedback={summaryFeedback}
+              videoId={videoId}
+              loadVideo={loadVideo}
+              setManualTargetText={setManualTargetText}
+              userId={userId}
+              userProfile={userProfile}
+              setDictData={setDictData}
+              addXp={addXp}
+            />
           </div>
         )}
       </div>

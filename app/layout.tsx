@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "ja_JP",
-    url: "https://vercel.com/nakis-projects-d1ae2531/my-language-dojo-l8cl", // ※ドメイン取得後に修正してください
+    url: "https://my-language-dojo-l8cl.vercel.app",
     title: "Vidnitive - Master Languages with AI & Video",
     description: "動画で学ぶ、AIが支える。ネイティブの感覚を掴む新しい学習体験。",
     siteName: "Vidnitive",
