@@ -47,6 +47,16 @@ export default function RootLayout({
       <body className={inter.className}>
         <AuthProvider>
           {children}
+          <footer className="py-6 text-center text-xs text-gray-500 border-t mt-auto bg-gray-50">
+            <div className="space-x-4">
+              <a href="/privacy" className="hover:underline">Privacy Policy</a>
+              <span>|</span>
+              <a href="/terms" className="hover:underline">Terms of Service</a>
+              <span>|</span>
+              <a href="https://ofuse.me/292a29e6" target="_blank" rel="noopener noreferrer" className="hover:underline">Ofuse</a>
+            </div>
+            <p className="mt-2">&copy; {new Date().getFullYear()} My Language Dojo. All rights reserved.</p>
+          </footer>
         </AuthProvider>
       </body>
     </html>
