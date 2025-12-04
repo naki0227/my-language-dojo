@@ -1,3 +1,4 @@
+```javascript
 // next.config.mjs
 import createMDX from '@next/mdx'
 
@@ -5,7 +6,7 @@ import createMDX from '@next/mdx'
 const nextConfig = {
   /* config options here */
   pageExtensions: ['js', 'jsx', 'md', 'mdx', 'ts', 'tsx'],
-  output: (process.env.IS_MOBILE_BUILD ? 'export' : undefined) as 'export' | undefined,
+  output: process.env.IS_MOBILE_BUILD ? 'export' : undefined,
   images: {
     unoptimized: true,
   },
