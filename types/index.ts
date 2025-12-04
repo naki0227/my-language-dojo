@@ -25,6 +25,7 @@ export type UserLevelData = {
 
 export type UserProfile = {
     id: string;
+    username?: string;
     level: number;
     xp: number;
     next_level_xp: number;

@@ -23,6 +23,7 @@ import {
 import { VideoPlayerArea } from '@/components/VideoPlayerArea';
 import { StudyGuide } from '@/components/StudyGuide';
 import { Subtitle, DictionaryData, UserLevelData, UserProfile } from '@/types';
+import { useAuth } from '@/components/AuthProvider';
 
 // --- 型定義 ---
 // --- 型定義 ---
@@ -45,17 +46,18 @@ function HomeContent() {
   const paramVideoId = searchParams.get('videoId');
   const initialVideoId = 'arj7oStGLkU';
 
-  // ユーザー情報
-  const [userId, setUserId] = useState<string | null>(null);
-  const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [username, setUsername] = useState<string>('');
-  const [userProfile, setUserProfile] = useState<UserProfile>({
-    id: '', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
-  });
-
-  const [currentLevelData, setCurrentLevelData] = useState<UserLevelData>({
+  const { user, profile, levelData, loading, signOut, updateProfile, updateLevelData } = useAuth();
+  const userId = user?.id || null;
+  const userProfile = profile || {
+    id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: '', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
+  } as UserProfile;
+  const currentLevelData = levelData || {
     user_id: '', subject: 'English', level_result: 'A1 (Beginner)', score: 0, xp: 0
-  });
+  } as UserLevelData;
+
+  // Local UI state
+  const [username, setUsername] = useState<string>(''); // Keep for local edit state or derive from profile?
+  // Actually profile has username. Let's derive initial state for edit fields from profile when it loads.
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [showPlacementTest, setShowPlacementTest] = useState(false);
@@ -138,10 +140,8 @@ function HomeContent() {
   const [isSubtitleLoading, setIsSubtitleLoading] = useState(false);
   const [playError, setPlayError] = useState(false);
 
-  // ★画面サイズ判定用
   const [isMobile, setIsMobile] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
   const loadedVideoIdRef = useRef<string | null>(null);
@@ -163,35 +163,17 @@ function HomeContent() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Sync local edit state with profile
   useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-          setUserId(session.user.id);
-          setUserEmail(session.user.email || null);
-          await fetchProfile(session.user.id);
-        } else {
-          // Guest Mode
-          setUserId(null);
-          setUserEmail(null);
-          setUsername('Guest');
-          setEditName('Guest');
-          setEditGoal('Try the app!');
-          setEditLangs(['Japanese']);
-          setUserProfile({
-            id: 'guest', level: 1, xp: 0, next_level_xp: 100, theme: 'student', goal: 'Try the app!', placement_test_done: true, learning_target: 'English', study_guide_langs: ['Japanese']
-          });
-        }
-      } catch (e) {
-        console.error("Session check error:", e);
-      } finally {
-        setIsAuthLoading(false);
-      }
-    };
-    checkSession();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    if (profile) {
+      setUsername(profile.username || 'Hero');
+      setEditName(profile.username || 'Hero');
+      setEditGoal(profile.goal || '');
+      setEditLangs(profile.study_guide_langs || ['Japanese']);
+      setEditTheme(profile.theme || 'student');
+      if (profile.placement_test_done === false) setShowPlacementTest(true);
+    }
+  }, [profile]);
 
   const loadVideo = useCallback(async (id: string, expLangs: string[] = ['Japanese']) => {
     if (id === loadedVideoIdRef.current && JSON.stringify(expLangs) === JSON.stringify(explanationLangs)) return;
@@ -275,32 +257,7 @@ function HomeContent() {
     }
   }, [paramVideoId, initialVideoId, loadVideo]);
 
-  const fetchProfile = async (uid: string) => {
-    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', uid).single();
-    if (profileData) {
-      setUserProfile(profileData as UserProfile);
-      setUsername(profileData.username || 'Hero');
-      setEditName(profileData.username || 'Hero');
-      setEditGoal(profileData.goal || '');
-      setEditLangs(profileData.study_guide_langs || ['Japanese']);
-      setEditTheme(profileData.theme || 'student');
-      if (profileData.placement_test_done === false) setShowPlacementTest(true);
 
-      const { data: levelData } = await supabase
-        .from('user_levels')
-        .select('*')
-        .match({ user_id: uid, subject: profileData.learning_target })
-        .single();
-
-      const initialLevel = { user_id: uid, subject: profileData.learning_target, level_result: 'A1 (Beginner)', score: 0, xp: 0 };
-      if (levelData) {
-        setCurrentLevelData(levelData as UserLevelData);
-      } else {
-        await supabase.from('user_levels').insert(initialLevel);
-        setCurrentLevelData(initialLevel as UserLevelData);
-      }
-    }
-  };
 
   const logStudyActivity = async () => {
     if (!userId) return;
@@ -311,54 +268,34 @@ function HomeContent() {
   };
 
   const addXp = async (amount: number) => {
-    if (!userId) return;
-    const { data: current } = await supabase.from('user_levels').select('xp').match({ user_id: userId, subject: userProfile.learning_target }).single();
-    if (!current) return;
-    const newXp = current.xp + amount;
-    await supabase.from('user_levels').update({ xp: newXp }).match({ user_id: userId, subject: userProfile.learning_target });
-    setCurrentLevelData(prev => ({ ...prev, xp: newXp }));
+    if (!userId || !levelData) return;
+    const newXp = levelData.xp + amount;
+    await updateLevelData({ xp: newXp });
     logStudyActivity();
   };
 
   const handleTargetLanguageChange = async (newLang: string) => {
     if (!userId) return;
     try {
-      await supabase.from('profiles').update({ learning_target: newLang }).eq('id', userId);
-      setUserProfile(prev => ({ ...prev, learning_target: newLang }));
-
-      // Sync Study Guide Language (Use newLang as primary, keep others if they exist, or just reset to newLang?)
-      // User likely wants to see explanations in their new target language.
-      // Let's just set it to [newLang] for simplicity, or add it?
-      // "studyguideの言語も対象言語と同じ言語にしたい" -> Set to [newLang]
+      await updateProfile({ learning_target: newLang });
       setExplanationLangs([newLang]);
       loadVideo(videoId, [newLang]);
-
-      // Reload to refresh other components if needed (or just state update is enough?)
-      // window.location.reload(); // Let's try to avoid reload for smoother UX
     } catch (e) { alert('設定の保存に失敗しました'); }
   };
 
   const handleManualLevelChange = async (newLevel: string) => {
     if (!userId) return;
     try {
-      await supabase.from('user_levels').update({ level_result: newLevel }).match({ user_id: userId, subject: userProfile.learning_target });
-      setCurrentLevelData(prev => ({ ...prev, level_result: newLevel }));
+      await updateLevelData({ level_result: newLevel });
       alert(`${userProfile.learning_target} のレベルを ${newLevel} に設定しました！`);
     } catch (e) { alert('レベルの保存に失敗しました'); }
   };
 
   const handleSaveSettings = async (newTheme: 'kids' | 'student' | 'pro', newGoal: string, newLangs: string[], newName: string) => {
-    // Guest Mode: Update local state only
-    if (!userId) {
-      setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
-      setUsername(newName);
-      setIsSettingsOpen(false);
-      return;
-    }
+    // Guest Mode: Update local state only (via updateProfile which handles null user internally? No, updateProfile checks user)
+    // Actually my AuthProvider implementation of updateProfile handles guest state locally!
     try {
-      await supabase.from('profiles').update({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs, username: newName }).eq('id', userId);
-      setUserProfile(prev => ({ ...prev, theme: newTheme, goal: newGoal, study_guide_langs: newLangs }));
-      setUsername(newName);
+      await updateProfile({ theme: newTheme, goal: newGoal, study_guide_langs: newLangs, username: newName });
       setIsSettingsOpen(false);
     } catch (e) { alert('設定の保存に失敗しました'); }
   };
@@ -540,12 +477,12 @@ function HomeContent() {
     }
   };
 
-  if (isAuthLoading || !mounted) return <div className="p-10 text-center">Loading...</div>;
+  if (loading || !mounted) return <div className="p-10 text-center">Loading...</div>;
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
 
   const playAudio = () => dictData?.audio && new Audio(dictData.audio).play();
-  const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
+  const handleLogout = async () => { await signOut(); router.push('/auth'); };
 
 
 
@@ -658,12 +595,12 @@ function HomeContent() {
             <div className="mb-8">
               <h3 className="text-sm font-bold text-gray-500 mb-3 uppercase tracking-wider">Account</h3>
               <div className="space-y-4">
-                {userEmail && (
+                {user?.email && (
                   <div>
                     <label className="block text-sm font-bold mb-1 text-gray-700">Email</label>
                     <input
                       type="text"
-                      value={userEmail}
+                      value={user.email}
                       readOnly
                       className="w-full p-3 rounded-lg border border-gray-200 bg-gray-50 text-gray-500 cursor-not-allowed"
                     />
@@ -682,7 +619,7 @@ function HomeContent() {
                   <button
                     onClick={async () => {
                       if (confirm('Are you sure you want to logout?')) {
-                        await supabase.auth.signOut();
+                        await signOut();
                         window.location.reload();
                       }
                     }}
