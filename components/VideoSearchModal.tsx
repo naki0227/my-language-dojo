@@ -15,6 +15,8 @@ type Props = {
     currentSubject?: string; // 言語フィルタ用
 };
 
+import { getApiUrl } from '@/lib/api';
+
 export default function VideoSearchModal({ onSelect, onClose, currentSubject = 'English' }: Props) {
     const [query, setQuery] = useState('');
     const [videos, setVideos] = useState<Video[]>([]);
@@ -55,7 +57,7 @@ export default function VideoSearchModal({ onSelect, onClose, currentSubject = '
         // 3. YouTube検索 (クエリがある場合のみ)
         let youtubePromise: Promise<any[]> = Promise.resolve([]);
         if (query && query.length > 2) {
-            youtubePromise = fetch(`/api/youtube/search?q=${encodeURIComponent(query)}`)
+            youtubePromise = fetch(getApiUrl(`/api/youtube/search?q=${encodeURIComponent(query)}`))
                 .then(res => res.json())
                 .then(data => {
                     if (Array.isArray(data)) {

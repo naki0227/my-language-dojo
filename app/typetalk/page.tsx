@@ -13,6 +13,8 @@ type Message = {
 
 const TOPICS = ['Self Introduction', 'Travel Plans', 'Ordering Food', 'Hobbies', 'Job Interview'];
 
+import { getApiUrl } from '@/lib/api';
+
 export default function TypeTalkPage() {
     const [messages, setMessages] = useState<Message[]>([
         { role: 'ai', text: "Hi! I'm your AI partner. Let's chat! What topic shall we talk about?" }
@@ -87,7 +89,7 @@ export default function TypeTalkPage() {
         setShowHint(false);
 
         try {
-            const res = await fetch('/api/ai/typetalk', {
+            const res = await fetch(getApiUrl('/api/ai/typetalk'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMsg.text, topic, typingTime: timeTaken })

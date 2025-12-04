@@ -272,7 +272,7 @@ export default function Dashboard() {
                             </div>
                             <div className="space-y-4">
                                 {history.map((item) => (
-                                    <Link key={item.id} href={item.content_type === 'video' ? `/?videoId=${item.target_id}` : `/textbook/${item.target_id}`} className="block group">
+                                    <Link key={item.id} href={item.content_type === 'video' ? `/?videoId=${item.target_id}` : `/textbook/view?id=${item.target_id}`} className="block group">
                                         <div className="p-3 rounded-xl hover:bg-white/60 transition border border-transparent hover:border-indigo-100">
                                             <div className="text-sm font-bold text-gray-800 truncate group-hover:text-indigo-600 transition mb-1">{item.title || 'No Title'}</div>
                                             <div className="text-xs text-gray-400">{new Date(item.viewed_at).toLocaleDateString()}</div>

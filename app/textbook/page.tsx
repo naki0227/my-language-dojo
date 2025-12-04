@@ -149,7 +149,7 @@ export default function TextbookList() {
                             filteredBooks.map((book) => {
                                 let badge = book.level || 'DOC';
                                 return (
-                                    <Link key={book.id} href={`/textbook/${book.id}`} className="group block glass-card overflow-hidden hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-0">
+                                    <Link key={book.id} href={`/textbook/view?id=${book.id}`} className="group block glass-card overflow-hidden hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-0">
                                         <div className={`h-40 bg-gradient-to-br from-indigo-50 to-purple-50 flex items-center justify-center relative overflow-hidden group-hover:from-indigo-100 group-hover:to-purple-100 transition-colors`}>
                                             <span className="text-8xl opacity-10 font-black text-indigo-900 transform group-hover:scale-110 transition duration-700">{badge}</span>
                                             <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-lg text-xs font-bold text-indigo-600 shadow-sm">Level {badge}</div>

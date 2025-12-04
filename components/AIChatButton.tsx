@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MessageCircle, Send, X, Minimize2, Maximize2, PlayCircle, BookOpen } from 'lucide-react';
+import { getApiUrl } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 
@@ -37,7 +38,7 @@ export default function AIChatButton({ userId }: { userId: string }) {
         setIsLoading(true);
 
         try {
-            const res = await fetch('/api/ai/chat', {
+            const res = await fetch(getApiUrl('/api/ai/chat'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMsg.text, userId }),

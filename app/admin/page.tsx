@@ -22,6 +22,8 @@ type Wordbook = { id: number; title: string; };
 type MissingVideo = { id: string; title: string; source: string; };
 type FoundVideo = { videoId: string; title: string; thumbnail: string; status?: 'waiting' | 'saving' | 'done' | 'error'; };
 
+import { getApiUrl } from '@/lib/api';
+
 export default function AdminPage() {
     const router = useRouter();
     const [isAdmin, setIsAdmin] = useState(false);
@@ -146,7 +148,7 @@ export default function AdminPage() {
     const fetchMissingVideos = async () => {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
-        const res = await fetch('/api/admin/missing_transcripts', {
+        const res = await fetch(getApiUrl('/api/admin/missing_transcripts'), {
             headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
         const data = await res.json();
@@ -199,7 +201,7 @@ export default function AdminPage() {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
         try {
-            const res = await fetch('/api/admin/find_video', {
+            const res = await fetch(getApiUrl('/api/admin/find_video'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ mode: finderMode, value: finderInput, subject: currentAdminSubject })
@@ -222,7 +224,7 @@ export default function AdminPage() {
             newVideos[i].status = 'saving'; setFoundVideos([...newVideos]);
             try {
                 await supabase.from('library_videos').upsert({ video_id: newVideos[i].videoId, title: newVideos[i].title, thumbnail_url: newVideos[i].thumbnail, user_id: (await supabase.auth.getSession()).data.session?.user.id });
-                const res = await fetch(`/api/transcript?videoId=${newVideos[i].videoId}&lang=en`);
+                const res = await fetch(getApiUrl(`/api/transcript?videoId=${newVideos[i].videoId}&lang=en`));
                 if (res.ok) newVideos[i].status = 'done'; else newVideos[i].status = 'error';
             } catch (e) { newVideos[i].status = 'error'; }
             setFoundVideos([...newVideos]); await new Promise(r => setTimeout(r, 1000));
@@ -254,7 +256,7 @@ export default function AdminPage() {
                         try {
                             const { data: { session } } = await supabase.auth.getSession();
                             if (!session) throw new Error('No session');
-                            const res = await fetch('/api/admin/generate_single_content', {
+                            const res = await fetch(getApiUrl('/api/admin/generate_single_content'), {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                                 body: JSON.stringify({ subject: sub, level: lvl, type: type })
@@ -300,7 +302,7 @@ export default function AdminPage() {
             const startTime = Date.now();
             setProcessLog(prev => [`⏳ Processing (${i + 1}/${totalVideos}): ${video.title}...`, ...prev]);
             try {
-                const res = await fetch(`/api/transcript?videoId=${video.id}&lang=en`);
+                const res = await fetch(getApiUrl(`/api/transcript?videoId=${video.id}&lang=en`));
                 const duration = (Date.now() - startTime) / 1000;
                 if (res.ok) { totalSuccess++; setProcessLog(prev => [`✅ Success (${video.id}) [Time: ${duration.toFixed(1)}s]`, ...prev]); }
                 else {
@@ -322,7 +324,7 @@ export default function AdminPage() {
     const handleGenerate = async () => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/ai/textbook', {
+            const res = await fetch(getApiUrl('/api/ai/textbook'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ topic, category, targetSubject: currentAdminSubject }),
             });
@@ -341,7 +343,7 @@ export default function AdminPage() {
         if (!title || !content) return;
         setIsSaving(true);
         try {
-            const res = await fetch('/api/ai/textbook/save', {
+            const res = await fetch(getApiUrl('/api/ai/textbook/save'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ title, content, subject: currentAdminSubject, category }),
             });
@@ -373,7 +375,7 @@ export default function AdminPage() {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) throw new Error('No session');
 
-            const res = await fetch('/api/admin/generate_study_guide', {
+            const res = await fetch(getApiUrl('/api/admin/generate_study_guide'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({
@@ -399,7 +401,7 @@ export default function AdminPage() {
     const handleAiDailyPick = async () => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/ai/daily', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: currentAdminSubject }) });
+            const res = await fetch(getApiUrl('/api/ai/daily'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subject: currentAdminSubject }) });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
             setTopic(data.videoId); setContent(data.message); setDailyQuiz(data.quiz);
@@ -413,7 +415,7 @@ export default function AdminPage() {
         try {
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;
-            const res = await fetch('/api/admin/roadmap', {
+            const res = await fetch(getApiUrl('/api/admin/roadmap'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                 body: JSON.stringify({ level: roadmapLevel, keywords: roadmapQuery, targetSubject: currentAdminSubject }),
             });
@@ -426,7 +428,7 @@ export default function AdminPage() {
     const handleGenerateReading = async () => {
         setIsGenerating(true);
         try {
-            const res = await fetch('/api/ai/reading', {
+            const res = await fetch(getApiUrl('/api/ai/reading'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ subject: currentAdminSubject, level: readingLevel, category: readingCategory, topic: readingTopic })
@@ -452,7 +454,7 @@ export default function AdminPage() {
             for (let i = 0; i < readingBulkCount; i++) {
                 setReadingLogs(prev => [`⏳ [${sub}] Generating (${i + 1}/${readingBulkCount})...`, ...prev]);
                 try {
-                    const res = await fetch('/api/ai/reading', {
+                    const res = await fetch(getApiUrl('/api/ai/reading'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ subject: sub, level: readingLevel, category: readingCategory, topic: '' }) // Bulk uses auto-topic
@@ -492,7 +494,7 @@ export default function AdminPage() {
                 try {
                     const { data: { session } } = await supabase.auth.getSession();
                     if (!session) throw new Error('No session');
-                    const res = await fetch('/api/admin/generate_questions', {
+                    const res = await fetch(getApiUrl('/api/admin/generate_questions'), {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session.access_token}` },
                         body: JSON.stringify({ subject: sub, level: testLevel, count: currentBatchSize })
@@ -514,7 +516,7 @@ export default function AdminPage() {
     const runSetupStep = async (step: number) => {
         setIsGenerating(true);
         try {
-            const endpoint = step === 1 ? '/api/admin/full_setup' : '/api/ai/textbook_bulk';
+            const endpoint = step === 1 ? getApiUrl('/api/admin/full_setup') : getApiUrl('/api/ai/textbook_bulk');
             const body = { subject: currentAdminSubject };
             const { data: { session } } = await supabase.auth.getSession();
             if (!session) return;

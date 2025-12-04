@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from 'react
 import { supabase } from '@/lib/supabase';
 import { User } from '@supabase/supabase-js';
 import { UserProfile, UserLevelData } from '@/types';
+import { App } from '@capacitor/app';
 
 interface AuthContextType {
     user: User | null;
@@ -86,8 +87,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+
+
+    // ... existing imports
+
     useEffect(() => {
         let mounted = true;
+
+        // Listen for deep links (Mobile Auth Callback)
+        App.addListener('appUrlOpen', async (data) => {
+            if (!mounted) return;
+            // Supabase handles the URL if it contains access_token
+            // We just need to ensure the session is refreshed
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                setUser(session.user);
+                await fetchProfile(session.user.id);
+            }
+        });
 
         // Safety timeout: If Supabase doesn't respond in 3s, fallback to guest
         const safetyTimeout = setTimeout(() => {
@@ -124,6 +141,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             mounted = false;
             clearTimeout(safetyTimeout);
             subscription.unsubscribe();
+            App.removeAllListeners();
         };
     }, []);
 

@@ -136,7 +136,7 @@ export default function DrillIndex() {
                             {wordbooks.length === 0 && <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl">No vocabulary books found for this level.</div>}
                             <div className="space-y-4">
                                 {wordbooks.map((book) => (
-                                    <Link key={book.id} href={`/drill/word/${book.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-blue-200 group">
+                                    <Link key={book.id} href={`/drill/word/view?id=${book.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-blue-200 group">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">{book.title}</div>
                                             <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">{book.level}</span>
@@ -156,7 +156,7 @@ export default function DrillIndex() {
                             {exercises.length === 0 && <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl">No exercises found for this level.</div>}
                             <div className="space-y-4">
                                 {exercises.map((ex) => (
-                                    <Link key={ex.id} href={`/drill/exam/${ex.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-red-200 group">
+                                    <Link key={ex.id} href={`/drill/exam/view?id=${ex.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-red-200 group">
                                         <div className="flex justify-between items-start mb-2">
                                             <div className="font-bold text-lg text-gray-800 group-hover:text-red-600 transition">{ex.title}</div>
                                             <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">{ex.level}</span>

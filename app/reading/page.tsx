@@ -45,7 +45,7 @@ export default function ReadingList() {
                     {readings.map((item) => (
                         <Link
                             key={item.id}
-                            href={`/reading/${item.id}`}
+                            href={`/reading/view?id=${item.id}`}
                             className="group block glass-card p-6 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 border-0"
                         >
                             <div className="flex justify-between items-start mb-4">

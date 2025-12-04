@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { Capacitor } from '@capacitor/core';
 
 export default function AuthPage() {
     const router = useRouter();
@@ -11,12 +12,19 @@ export default function AuthPage() {
     const [isLogin, setIsLogin] = useState(true); // ログインか登録か
     const [loading, setLoading] = useState(false);
 
+    // ... existing imports
+
     const handleGoogleLogin = async () => {
         setLoading(true);
+
+        const redirectTo = Capacitor.isNativePlatform()
+            ? 'com.enludus.app://auth/callback'
+            : `${window.location.origin}/auth/callback`;
+
         const { error } = await supabase.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: `${window.location.origin}/auth/callback`,
+                redirectTo,
             },
         });
         if (error) {

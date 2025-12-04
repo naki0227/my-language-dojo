@@ -24,6 +24,7 @@ import { VideoPlayerArea } from '@/components/VideoPlayerArea';
 import { StudyGuide } from '@/components/StudyGuide';
 import { Subtitle, DictionaryData, UserLevelData, UserProfile } from '@/types';
 import { useAuth } from '@/components/AuthProvider';
+import { getApiUrl } from '@/lib/api';
 
 // --- 型定義 ---
 // --- 型定義 ---
@@ -206,7 +207,7 @@ function HomeContent() {
 
         // Auto-generate
         console.log(`No study guide found for ${lang}. Auto-generating...`);
-        const genRes = await fetch('/api/study_guide/generate', {
+        const genRes = await fetch(getApiUrl('/api/study_guide/generate'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: lang })
@@ -221,6 +222,11 @@ function HomeContent() {
         }
       } catch (e) {
         console.error(`Auto-gen error for ${lang}`, e);
+        if (e instanceof Error) {
+          console.error('Error details:', e.message, e.stack);
+        } else {
+          console.error('Unknown error:', JSON.stringify(e));
+        }
         return { lang, error: e };
       }
     };
@@ -308,7 +314,7 @@ function HomeContent() {
       let updatedSubtitles = [...subtitles];
       const promises = langsToFetch.map(async (lang) => {
         if (updatedSubtitles.length > 0 && updatedSubtitles[0].translations[lang]) return null;
-        const res = await fetch(`/api/transcript?videoId=${videoId}&lang=${lang}`);
+        const res = await fetch(getApiUrl(`/api/transcript?videoId=${videoId}&lang=${lang}`));
         const data = await res.json();
         return { lang, data };
       });
@@ -334,7 +340,7 @@ function HomeContent() {
       setIsTranslating(true);
       setShowTranslation(true);
       try {
-        const res = await fetch(`/api/transcript?videoId=${videoId}&lang=${targetLang}`);
+        const res = await fetch(getApiUrl(`/api/transcript?videoId=${videoId}&lang=${targetLang}`));
         const data = await res.json();
         if (data.error) {
           alert('翻訳に失敗しました');
@@ -400,7 +406,7 @@ function HomeContent() {
       }
       setSelectedWord(cleanWord); setDictData(null); setIsLoading(true);
       try {
-        const aiRes = await fetch('/api/ai/analyze', {
+        const aiRes = await fetch(getApiUrl('/api/ai/analyze'), {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ word: cleanWord, targetLang: userProfile.learning_target })
         });
@@ -457,7 +463,7 @@ function HomeContent() {
     if (!userSummary.trim()) return;
     setIsCheckingSummary(true);
     try {
-      const res = await fetch('/api/ai/chat', {
+      const res = await fetch(getApiUrl('/api/ai/chat'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

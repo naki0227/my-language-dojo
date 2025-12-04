@@ -66,6 +66,8 @@ export default function EmbeddedPlayer({ videoId, start, title }: Props) {
                                     start: start, // 指定時間から開始
                                     modestbranding: 1,
                                     controls: 1,
+                                    // Mobile app workaround: Set origin to production URL to allow embedding
+                                    origin: 'https://enludus.vercel.app',
                                 },
                             }}
                             className="absolute top-0 left-0 w-full h-full"

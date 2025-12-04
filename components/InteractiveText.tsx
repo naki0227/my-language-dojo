@@ -3,18 +3,10 @@
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import ReactMarkdown from 'react-markdown';
+import { DictionaryData } from '@/types';
+import { getApiUrl } from '@/lib/api';
 
-// 辞書モーダルを内部で持つか、Propsで制御するか...
-// シンプルにするため、このコンポーネント自体が「タップされたら親に通知」する形にします。
-// 実際の辞書表示は page.tsx が持っているロジックを再利用したいところですが、
-// ここでは「独立した辞書モーダル」を持つ形にします。
-
-type DictionaryData = {
-    word: string; translation?: string;
-    meanings?: { partOfSpeech: string; definitions: { definition: string }[]; }[];
-};
-
-export default function InteractiveText({ content, language }: { content: string, language: string }) {
+export default function InteractiveText({ content, subject }: { content: string, subject: string }) {
     const [selectedWord, setSelectedWord] = useState<string | null>(null);
     const [dictData, setDictData] = useState<DictionaryData | null>(null);
     const [loading, setLoading] = useState(false);
@@ -30,9 +22,9 @@ export default function InteractiveText({ content, language }: { content: string
 
         try {
             // メイン画面と同じAPIを呼ぶ
-            const aiRes = await fetch('/api/ai/analyze', {
+            const aiRes = await fetch(getApiUrl('/api/ai/analyze'), {
                 method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ word: clean, targetLang: language })
+                body: JSON.stringify({ word: clean, targetLang: subject })
             });
             const data = await aiRes.json();
             setDictData({
@@ -41,7 +33,7 @@ export default function InteractiveText({ content, language }: { content: string
                 meanings: [{ partOfSpeech: data.partOfSpeech, definitions: [{ definition: data.definition }] }]
             });
         } catch {
-            setDictData({ word: clean, translation: "エラー" });
+            setDictData({ word: clean, translation: "エラー", sourceLang: subject });
         } finally {
             setLoading(false);
         }
@@ -56,7 +48,7 @@ export default function InteractiveText({ content, language }: { content: string
             user_id: session.user.id,
             word: dictData.word,
             translation: dictData.translation || '',
-            subject: language
+            subject: subject
         }]);
         alert('保存しました！');
         setSelectedWord(null);

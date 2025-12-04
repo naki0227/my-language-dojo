@@ -8,7 +8,9 @@ type Props = {
     targetText: string; // ← 親から受け取る「今練習すべき文章」
 };
 
-export default function VoiceRecorder({ targetText }: Props) {
+import { getApiUrl } from '@/lib/api';
+
+export default function VoiceRecorder({ targetText }: { targetText: string }) {
     const [isRecording, setIsRecording] = useState(false);
     const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -63,7 +65,7 @@ export default function VoiceRecorder({ targetText }: Props) {
         formData.append('text', targetText);
 
         try {
-            const res = await fetch('/api/grade', {
+            const res = await fetch(getApiUrl('/api/grade'), {
                 method: 'POST',
                 body: formData,
             });

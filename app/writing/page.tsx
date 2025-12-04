@@ -10,6 +10,8 @@ const TOPICS = [
     'Why I learn languages', 'Technology and Future', 'Daily Routine'
 ];
 
+import { getApiUrl } from '@/lib/api';
+
 export default function WritingPage() {
     const [userId, setUserId] = useState<string | null>(null);
     const [topic, setTopic] = useState(TOPICS[0]);
@@ -36,7 +38,7 @@ export default function WritingPage() {
         setResult(null);
 
         try {
-            const res = await fetch('/api/ai/writing', {
+            const res = await fetch(getApiUrl('/api/ai/writing'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text, topic, targetSubject })

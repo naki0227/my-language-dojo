@@ -7,6 +7,8 @@ import { loadStripe } from '@stripe/stripe-js';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
+import { getApiUrl } from '@/lib/api';
+
 export default function PricingPage() {
     const [isUpgrading, setIsUpgrading] = useState(false);
 
@@ -21,7 +23,7 @@ export default function PricingPage() {
 
         try {
             // 1. Create Checkout Session
-            const response = await fetch('/api/checkout', {
+            const response = await fetch(getApiUrl('/api/checkout'), {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
