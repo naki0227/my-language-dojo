@@ -1,4 +1,3 @@
-```javascript
 // next.config.mjs
 import createMDX from '@next/mdx'
 
