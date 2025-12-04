@@ -63,20 +63,24 @@ export default function WritingPage() {
     };
 
     return (
-        <main className="min-h-screen bg-indigo-50 p-6 flex flex-col items-center font-sans text-gray-800">
-            <div className="w-full max-w-3xl">
-                <div className="flex justify-between items-center mb-6">
-                    <h1 className="text-3xl font-bold text-indigo-700 flex items-center gap-2">
-                        <PenTool /> Writing Dojo ({targetSubject})
+        <main className="min-h-screen p-4 md:p-8 relative overflow-hidden flex flex-col items-center">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
+
+            <div className="w-full max-w-4xl relative z-10">
+                <div className="flex justify-between items-center mb-8">
+                    <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3 tracking-tight">
+                        <span className="text-4xl text-indigo-600"><PenTool /></span> Vidnitive Writing ({targetSubject})
                     </h1>
-                    <Link href="/" className="text-gray-500 hover:text-indigo-600">Exit</Link>
+                    <Link href="/" className="glass px-6 py-2 rounded-xl font-bold text-indigo-600 hover:bg-white/50 transition">← Studio</Link>
                 </div>
 
                 {/* 入力エリア */}
-                <div className="bg-white p-6 rounded-2xl shadow-lg mb-8">
-                    <div className="mb-4">
-                        <label className="block text-sm font-bold text-gray-500 mb-2">Topic</label>
-                        <select value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-3 rounded-lg bg-gray-50 border border-gray-200 font-bold">
+                <div className="glass-card p-8 mb-8">
+                    <div className="mb-6">
+                        <label className="block text-sm font-bold text-gray-500 mb-2 uppercase tracking-wider">Topic</label>
+                        <select value={topic} onChange={(e) => setTopic(e.target.value)} className="w-full p-4 rounded-xl bg-white/50 border border-white/20 font-bold text-gray-700 focus:ring-2 focus:ring-indigo-400 outline-none transition">
                             {TOPICS.map(t => <option key={t} value={t}>{t}</option>)}
                         </select>
                     </div>
@@ -85,44 +89,52 @@ export default function WritingPage() {
                         value={text}
                         onChange={(e) => setText(e.target.value)}
                         placeholder={`Write about "${topic}" in ${targetSubject}...`}
-                        className="w-full h-48 p-4 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 outline-none resize-none text-lg mb-4"
+                        className="w-full h-64 p-6 rounded-xl bg-white/50 border border-white/20 focus:ring-2 focus:ring-indigo-400 outline-none resize-none text-lg mb-6 placeholder-gray-400 transition"
                     />
 
                     <button
                         onClick={handleAnalyze}
                         disabled={isAnalyzing || !text}
-                        className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition
-                ${isAnalyzing ? 'bg-gray-400' : 'bg-indigo-600 hover:bg-indigo-500'}
+                        className={`w-full py-4 rounded-xl font-bold text-lg text-white shadow-lg transition transform hover:scale-[1.02]
+                ${isAnalyzing ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:shadow-xl'}
              `}
                     >
-                        {isAnalyzing ? 'AI is correcting...' : '✍️ Submit for Correction'}
+                        {isAnalyzing ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <RefreshCw className="animate-spin" /> AI is correcting...
+                            </span>
+                        ) : (
+                            <span className="flex items-center justify-center gap-2">
+                                ✍️ Submit for Correction
+                            </span>
+                        )}
                     </button>
                 </div>
 
                 {/* 結果エリア */}
                 {result && (
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border-l-8 border-green-500 animate-slide-up">
-                        <div className="flex justify-between items-center mb-6 border-b pb-4">
+                    <div className="glass-card p-8 border-l-8 border-green-500 animate-slide-up">
+                        <div className="flex justify-between items-center mb-6 border-b border-gray-100 pb-4">
                             <h2 className="text-2xl font-bold text-green-600 flex items-center gap-2"><CheckCircle /> Result</h2>
-                            <span className="text-4xl font-black text-indigo-900">{result.score}<span className="text-lg text-gray-400">/100</span></span>
+                            <span className="text-5xl font-black text-indigo-900 tracking-tighter">{result.score}<span className="text-lg text-gray-400 font-medium ml-1">/100</span></span>
+                        </div>
+
+                        <div className="mb-8">
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">Corrected Text</p>
+                            <div className="text-xl font-medium text-gray-800 leading-relaxed bg-green-50/50 p-6 rounded-xl border border-green-100">
+                                {result.corrected}
+                            </div>
                         </div>
 
                         <div className="mb-6">
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Corrected Text</p>
-                            <p className="text-xl font-medium text-gray-800 leading-relaxed bg-green-50 p-4 rounded-lg">
-                                {result.corrected}
-                            </p>
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-2 tracking-wider">Feedback</p>
+                            <p className="text-gray-600 leading-relaxed">{result.feedback}</p>
                         </div>
 
-                        <div className="mb-4">
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Feedback</p>
-                            <p className="text-gray-600">{result.feedback}</p>
-                        </div>
-
-                        <div className="space-y-2">
+                        <div className="space-y-3 bg-indigo-50/50 p-6 rounded-xl border border-indigo-100">
                             {result.points?.map((p: string, i: number) => (
-                                <div key={i} className="flex items-start gap-2 text-sm text-indigo-600">
-                                    <span>•</span><span>{p}</span>
+                                <div key={i} className="flex items-start gap-3 text-sm text-indigo-700 font-medium">
+                                    <span className="text-indigo-400 mt-1">•</span><span>{p}</span>
                                 </div>
                             ))}
                         </div>

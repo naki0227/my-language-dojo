@@ -15,7 +15,12 @@ import AIChatButton from '@/components/AIChatButton';
 import VideoSearchModal from '@/components/VideoSearchModal';
 import LoginRequiredModal from '@/components/LoginRequiredModal';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
-import { ExternalLink, AlertCircle, HelpCircle } from 'lucide-react';
+import {
+  ExternalLink, AlertCircle, HelpCircle,
+  LayoutDashboard, Search, BookOpen, Flame, Library,
+  MessageCircle, PenTool, Headphones, Settings, LogIn,
+  Globe, Mic, CheckCircle, Lightbulb
+} from 'lucide-react';
 
 // --- 型定義 ---
 type Subtitle = { text: string; translation?: string; offset: number; duration: number; translations: { [key: string]: string }; };
@@ -293,9 +298,9 @@ function HomeContent() {
 
   const getThemeStyles = () => {
     switch (userProfile.theme) {
-      case 'kids': return 'font-sans text-lg bg-yellow-50 text-gray-900';
-      case 'pro': return 'font-mono text-sm bg-gray-900 text-gray-100';
-      default: return 'font-sans text-base bg-gray-50 text-gray-800';
+      case 'kids': return 'font-sans text-lg bg-yellow-50/50 text-gray-900';
+      case 'pro': return 'font-mono text-sm bg-gray-900/90 text-gray-100';
+      default: return 'font-sans text-base bg-white/30 text-gray-800';
     }
   };
 
@@ -693,7 +698,7 @@ function HomeContent() {
   const handleLogout = async () => { await supabase.auth.signOut(); router.push('/auth'); };
 
   const renderStudyGuide = () => (
-    <div className={`${isMobile ? 'w-full h-auto mt-6' : 'w-full h-full'} flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white/50 border-white/50'}`}>
+    <div className={`${isMobile ? 'w-full h-auto mt-6' : 'w-[450px] h-full shrink-0'} flex flex-col ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white/50 border-white/50'}`}>
       {/* Header */}
       <div className="p-4 border-b flex justify-between items-start relative border-gray-200/50">
         <div>
@@ -998,7 +1003,11 @@ function HomeContent() {
   );
 
   return (
-    <main className={`h-screen flex flex-col bg-gray-50 transition-colors duration-500 ${getThemeStyles()} overflow-hidden`}>
+    <main className={`h-screen flex flex-col transition-colors duration-500 ${getThemeStyles()} overflow-hidden relative`}>
+      {/* Decorative blobs */}
+      <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none z-0"></div>
+      <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none z-0"></div>
+      <div className="fixed bottom-0 right-1/4 w-96 h-96 bg-pink-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-4000 pointer-events-none z-0"></div>
 
       {showPlacementTest && userId && (
         <PlacementTest userId={userId} onComplete={() => setShowPlacementTest(false)} onSkip={() => setShowPlacementTest(false)} />
@@ -1154,17 +1163,37 @@ function HomeContent() {
         </div>
       )}
 
+
+
       {/* サブメニュー */}
       <div className={`shrink-0 w-full flex gap-2 overflow-x-auto p-2 border-b ${isPro ? 'bg-gray-900 border-gray-800 text-gray-300' : 'bg-gray-50 border-gray-200'}`}>
-        <Link href="/dashboard" className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📊 Dashboard</Link>
-        <button onClick={() => setIsSearchOpen(true)} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔍 検索</button>
-        <Link href="/vocab" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 単語</Link>
-        <Link href="/drill" className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🔥 ドリル</Link>
-        <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📖 教科書</Link>
-        <Link href="/reading" className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">📚 読み物</Link>
-        <Link href="/typetalk" className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">⌨️ 会話</Link>
-        <Link href="/writing" className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">✍️ 英作文</Link>
-        <Link href="/podcast" className="bg-pink-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap">🎧 Podcast</Link>
+        <Link href="/dashboard" className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <LayoutDashboard size={16} /> Dashboard
+        </Link>
+        <button onClick={() => setIsSearchOpen(true)} className="bg-blue-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <Search size={16} /> 検索
+        </button>
+        <Link href="/vocab" className="bg-green-600 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <BookOpen size={16} /> 単語
+        </Link>
+        <Link href="/drill" className="bg-red-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <Flame size={16} /> ドリル
+        </Link>
+        <Link href="/textbook" className="bg-orange-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <Library size={16} /> 教科書
+        </Link>
+        <Link href="/reading" className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <BookOpen size={16} /> 読み物
+        </Link>
+        <Link href="/typetalk" className="bg-yellow-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <MessageCircle size={16} /> 会話
+        </Link>
+        <Link href="/writing" className="bg-purple-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <PenTool size={16} /> 英作文
+        </Link>
+        <Link href="/podcast" className="bg-pink-500 text-white px-3 py-1.5 rounded-lg text-sm font-bold whitespace-nowrap flex items-center gap-2">
+          <Headphones size={16} /> Podcast
+        </Link>
       </div>
 
       {/* === レイアウト本体 === */}
@@ -1249,6 +1278,7 @@ function HomeContent() {
 
       {userId && <AIChatButton userId={userId} />}
 
+      {/* Footer */}
       <div className={`shrink-0 w-full p-4 border-t text-center text-xs text-gray-400 ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
         <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Information Student</a>.</p>
       </div>

@@ -78,82 +78,100 @@ export default function DrillIndex() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 p-8 flex flex-col items-center">
-            <div className="w-full max-w-5xl mb-6 flex flex-col md:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
-                    🔥 {currentSubject} Drill
-                </h1>
+        <main className="min-h-screen p-4 md:p-8 relative overflow-hidden">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-                <div className="flex items-center gap-4">
-                    <select
-                        value={currentSubject}
-                        onChange={(e) => handleSubjectChange(e.target.value)}
-                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm font-bold"
-                    >
-                        {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <Link href="/" className="bg-gray-200 px-4 py-2 rounded hover:bg-gray-300 text-gray-700">← Home</Link>
-                </div>
-            </div>
+            <div className="w-full max-w-6xl mx-auto relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                    <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3 tracking-tight">
+                        <span className="text-4xl">🔥</span> {currentSubject} Vidnitive Drill
+                    </h1>
 
-            {/* ★レベル選択タブ */}
-            <div className="w-full max-w-5xl mb-8 overflow-x-auto pb-2">
-                <div className="flex gap-2">
-                    {LEVELS.map(lvl => (
-                        <button
-                            key={lvl}
-                            onClick={() => handleLevelChange(lvl)}
-                            className={`px-4 py-2 rounded-full font-bold text-sm transition whitespace-nowrap
-                ${currentLevel === lvl
-                                    ? 'bg-red-500 text-white shadow-md scale-105'
-                                    : 'bg-white text-gray-500 border border-gray-200 hover:bg-gray-50'}
-              `}
+                    <div className="flex items-center gap-4">
+                        <select
+                            value={currentSubject}
+                            onChange={(e) => handleSubjectChange(e.target.value)}
+                            className="glass px-4 py-2 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-indigo-400"
                         >
-                            {lvl === 'ALL' ? 'すべて' : `Level ${lvl}`}
-                        </button>
-                    ))}
+                            {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <Link href="/" className="glass px-6 py-2 rounded-xl font-bold text-indigo-600 hover:bg-white/50 transition">← Studio</Link>
+                    </div>
                 </div>
+
+                {/* ★レベル選択タブ */}
+                <div className="glass-card p-4 mb-8 overflow-x-auto">
+                    <div className="flex gap-2 min-w-max">
+                        {LEVELS.map(lvl => (
+                            <button
+                                key={lvl}
+                                onClick={() => handleLevelChange(lvl)}
+                                className={`px-5 py-2.5 rounded-full font-bold text-sm transition whitespace-nowrap shadow-sm
+                    ${currentLevel === lvl
+                                        ? 'bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-md scale-105'
+                                        : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'}
+                  `}
+                            >
+                                {lvl === 'ALL' ? 'All Levels' : `Level ${lvl}`}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {isLoading ? (
+                    <div className="p-20 text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-red-500 mx-auto mb-4"></div>
+                        <p className="text-gray-500 font-medium">Loading Drills...</p>
+                    </div>
+                ) : (
+                    <div className="grid md:grid-cols-2 gap-8">
+                        {/* 単語帳 */}
+                        <div className="glass-card p-6 border-t-4 border-blue-500">
+                            <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                                <span className="text-blue-500">📚</span> Vocabulary
+                                <span className="text-sm font-normal text-gray-500 ml-auto bg-white/50 px-3 py-1 rounded-full">{wordbooks.length} Books</span>
+                            </h2>
+                            {wordbooks.length === 0 && <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl">No vocabulary books found for this level.</div>}
+                            <div className="space-y-4">
+                                {wordbooks.map((book) => (
+                                    <Link key={book.id} href={`/drill/word/${book.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-blue-200 group">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="font-bold text-lg text-gray-800 group-hover:text-blue-600 transition">{book.title}</div>
+                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-bold">{book.level}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-500 line-clamp-2">{book.description}</div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* 問題集 */}
+                        <div className="glass-card p-6 border-t-4 border-red-500">
+                            <h2 className="text-2xl font-bold mb-6 text-gray-800 flex items-center gap-2">
+                                <span className="text-red-500">✍️</span> Exercises
+                                <span className="text-sm font-normal text-gray-500 ml-auto bg-white/50 px-3 py-1 rounded-full">{exercises.length} Sets</span>
+                            </h2>
+                            {exercises.length === 0 && <div className="text-center py-10 text-gray-400 bg-gray-50/50 rounded-xl">No exercises found for this level.</div>}
+                            <div className="space-y-4">
+                                {exercises.map((ex) => (
+                                    <Link key={ex.id} href={`/drill/exam/${ex.id}`} className="block p-5 rounded-xl bg-white/60 hover:bg-white hover:shadow-lg transition border border-transparent hover:border-red-200 group">
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div className="font-bold text-lg text-gray-800 group-hover:text-red-600 transition">{ex.title}</div>
+                                            <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded font-bold">{ex.level}</span>
+                                        </div>
+                                        <div className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+                                            <span className="w-2 h-2 rounded-full bg-gray-300"></span>
+                                            Category: {ex.category}
+                                        </div>
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-
-            {isLoading ? (
-                <div className="p-10 text-center text-gray-500">Loading...</div>
-            ) : (
-                <div className="w-full max-w-5xl grid md:grid-cols-2 gap-8">
-                    {/* 単語帳 */}
-                    <div className="bg-white p-6 rounded-xl shadow-md">
-                        <h2 className="text-xl font-bold mb-4 text-blue-600 border-b pb-2">📚 Vocabulary ({wordbooks.length})</h2>
-                        {wordbooks.length === 0 && <p className="text-gray-400 text-sm">このレベルの単語帳はありません。</p>}
-                        <div className="space-y-3">
-                            {wordbooks.map((book) => (
-                                <Link key={book.id} href={`/drill/word/${book.id}`} className="block p-4 rounded-lg bg-blue-50 hover:bg-blue-100 transition border border-blue-100">
-                                    <div className="flex justify-between items-start">
-                                        <div className="font-bold text-lg text-gray-800">{book.title}</div>
-                                        <span className="text-xs bg-blue-200 text-blue-800 px-2 py-1 rounded">{book.level}</span>
-                                    </div>
-                                    <div className="text-sm text-gray-500">{book.description}</div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* 問題集 */}
-                    <div className="bg-white p-6 rounded-xl shadow-md">
-                        <h2 className="text-xl font-bold mb-4 text-red-600 border-b pb-2">✍️ Exercises ({exercises.length})</h2>
-                        {exercises.length === 0 && <p className="text-gray-400 text-sm">このレベルの問題集はありません。</p>}
-                        <div className="space-y-3">
-                            {exercises.map((ex) => (
-                                <Link key={ex.id} href={`/drill/exam/${ex.id}`} className="block p-4 rounded-lg bg-red-50 hover:bg-red-100 transition border border-red-100">
-                                    <div className="flex justify-between items-start">
-                                        <div className="font-bold text-lg text-gray-800">{ex.title}</div>
-                                        <span className="text-xs bg-red-200 text-red-800 px-2 py-1 rounded">{ex.level}</span>
-                                    </div>
-                                    <div className="text-sm text-gray-500 mt-1">Category: {ex.category}</div>
-                                </Link>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
         </main>
     );
 }

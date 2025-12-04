@@ -247,20 +247,24 @@ export default function PodcastPage() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-900 text-white flex flex-col items-center justify-center font-sans p-6 relative">
-            <div className="w-full max-w-md z-10">
+        <main className="min-h-screen p-4 md:p-8 relative overflow-hidden flex flex-col items-center justify-center">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
+
+            <div className="w-full max-w-md z-10 relative">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-2xl font-bold flex items-center gap-2"><Headphones className="text-pink-500" /> AI Podcast</h1>
-                    <Link href="/" className="text-gray-500 text-sm">Exit</Link>
+                    <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-800"><Headphones className="text-indigo-600" /> Vidnitive Podcast</h1>
+                    <Link href="/" className="text-gray-500 text-sm hover:text-indigo-600 transition font-bold">Exit</Link>
                 </div>
 
                 {/* Source Tabs */}
-                <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+                <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide justify-center">
                     {(['all', 'textbook', 'vocab', 'reading'] as const).map(s => (
                         <button
                             key={s}
                             onClick={() => setSource(s)}
-                            className={`px-4 py-1 rounded-full text-sm font-bold capitalize whitespace-nowrap transition ${source === s ? 'bg-pink-600 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
+                            className={`px-5 py-2 rounded-full text-sm font-bold capitalize whitespace-nowrap transition shadow-sm ${source === s ? 'bg-indigo-600 text-white shadow-md scale-105' : 'bg-white/80 text-gray-600 hover:bg-white'}`}
                         >
                             {s}
                         </button>
@@ -268,54 +272,61 @@ export default function PodcastPage() {
                 </div>
 
                 {/* アートワーク風表示 */}
-                <div className="aspect-square bg-gradient-to-br from-pink-500 to-indigo-600 rounded-3xl shadow-2xl mb-8 flex items-center justify-center relative overflow-hidden">
-                    <div className="text-center p-6">
-                        <div className="text-6xl mb-4">🎧</div>
-                        <h2 className="text-2xl font-bold mb-2 line-clamp-2">{playlist[currentIndex]?.title || 'Loading...'}</h2>
-                        <span className="bg-black/30 px-3 py-1 rounded-full text-xs font-bold uppercase">
+                <div className="aspect-square glass-card border-0 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-3xl shadow-2xl mb-8 flex items-center justify-center relative overflow-hidden group">
+                    <div className="text-center p-8 text-white z-10">
+                        <div className="text-7xl mb-6 transform group-hover:scale-110 transition duration-500">🎧</div>
+                        <h2 className="text-2xl font-bold mb-3 line-clamp-2 leading-tight">{playlist[currentIndex]?.title || 'Loading...'}</h2>
+                        <span className="bg-white/20 backdrop-blur-md px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider">
                             {playlist[currentIndex]?.type || 'System'}
                         </span>
                     </div>
-                    {isPlaying && <div className="absolute bottom-4 right-4 flex gap-1 h-4 items-end">
-                        <div className="w-1 bg-white animate-pulse h-full"></div>
-                        <div className="w-1 bg-white animate-pulse h-2"></div>
-                        <div className="w-1 bg-white animate-pulse h-3"></div>
+
+                    {/* Visualizer effect */}
+                    {isPlaying && <div className="absolute bottom-8 right-8 flex gap-1.5 h-6 items-end">
+                        <div className="w-1.5 bg-white/80 animate-pulse h-full rounded-full"></div>
+                        <div className="w-1.5 bg-white/80 animate-pulse h-3 rounded-full animation-delay-75"></div>
+                        <div className="w-1.5 bg-white/80 animate-pulse h-5 rounded-full animation-delay-150"></div>
+                        <div className="w-1.5 bg-white/80 animate-pulse h-2 rounded-full animation-delay-300"></div>
                     </div>}
+
+                    {/* Background decorations */}
+                    <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-t from-black/20 to-transparent pointer-events-none"></div>
                 </div>
 
                 {/* コントローラー */}
-                <div className="flex flex-col items-center gap-6">
-                    <div className="flex items-center gap-8">
-                        <button onClick={() => skip('prev')} className="text-gray-400 hover:text-white"><SkipBack size={32} /></button>
+                <div className="glass-card p-6 flex flex-col items-center gap-6">
+                    <div className="flex items-center gap-10">
+                        <button onClick={() => skip('prev')} className="text-gray-400 hover:text-indigo-600 transition"><SkipBack size={32} /></button>
                         <button
                             onClick={togglePlay}
-                            className="w-20 h-20 bg-white text-gray-900 rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition"
+                            className="w-20 h-20 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-105 hover:shadow-2xl transition transform"
                         >
                             {isPlaying ? <Pause size={32} fill="currentColor" /> : <Play size={32} fill="currentColor" className="ml-1" />}
                         </button>
-                        <button onClick={() => skip('next')} className="text-gray-400 hover:text-white"><SkipForward size={32} /></button>
+                        <button onClick={() => skip('next')} className="text-gray-400 hover:text-indigo-600 transition"><SkipForward size={32} /></button>
                     </div>
 
-                    <div className="flex justify-between w-full px-4">
-                        <div className="flex gap-4 text-sm font-bold text-gray-500">
-                            <button onClick={() => setRate(0.8)} className={rate === 0.8 ? 'text-pink-500' : ''}>0.8x</button>
-                            <button onClick={() => setRate(1.0)} className={rate === 1.0 ? 'text-pink-500' : ''}>1.0x</button>
-                            <button onClick={() => setRate(1.5)} className={rate === 1.5 ? 'text-pink-500' : ''}>1.5x</button>
+                    <div className="flex justify-between w-full px-2 pt-2 border-t border-gray-100">
+                        <div className="flex gap-4 text-sm font-bold text-gray-400">
+                            <button onClick={() => setRate(0.8)} className={`transition ${rate === 0.8 ? 'text-indigo-600' : 'hover:text-gray-600'}`}>0.8x</button>
+                            <button onClick={() => setRate(1.0)} className={`transition ${rate === 1.0 ? 'text-indigo-600' : 'hover:text-gray-600'}`}>1.0x</button>
+                            <button onClick={() => setRate(1.5)} className={`transition ${rate === 1.5 ? 'text-indigo-600' : 'hover:text-gray-600'}`}>1.5x</button>
                         </div>
-                        <button onClick={() => setShowScript(!showScript)} className="text-sm font-bold text-indigo-400 flex items-center gap-1">
+                        <button onClick={() => setShowScript(!showScript)} className="text-sm font-bold text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition">
                             <BookOpen size={16} /> {showScript ? 'Hide Script' : 'Show Script'}
                         </button>
                     </div>
                 </div>
 
                 {/* プレイリスト (簡易) */}
-                <div className="mt-10 border-t border-gray-800 pt-6">
-                    <p className="text-xs text-gray-500 mb-4 font-bold uppercase tracking-widest">Up Next</p>
-                    <div className="space-y-3 max-h-40 overflow-y-auto">
+                <div className="mt-8">
+                    <p className="text-xs text-gray-400 mb-3 font-bold uppercase tracking-widest pl-2">Up Next</p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
                         {playlist.map((item, i) => (
-                            <div key={i} onClick={() => { setCurrentIndex(i); setIsPlaying(true); }} className={`flex items-center gap-3 p-2 rounded cursor-pointer ${currentIndex === i ? 'bg-gray-800' : 'opacity-50 hover:opacity-100'}`}>
-                                <span className="text-xs font-mono text-gray-500 w-4">{i + 1}</span>
-                                <p className="text-sm truncate">{item.title}</p>
+                            <div key={i} onClick={() => { setCurrentIndex(i); setIsPlaying(true); }} className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition ${currentIndex === i ? 'bg-white shadow-sm border border-indigo-100' : 'hover:bg-white/50 text-gray-500'}`}>
+                                <span className={`text-xs font-mono w-5 text-center ${currentIndex === i ? 'text-indigo-600 font-bold' : 'text-gray-400'}`}>{i + 1}</span>
+                                <p className={`text-sm truncate ${currentIndex === i ? 'font-bold text-gray-800' : ''}`}>{item.title}</p>
+                                {currentIndex === i && <div className="ml-auto w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></div>}
                             </div>
                         ))}
                     </div>
@@ -324,17 +335,17 @@ export default function PodcastPage() {
 
             {/* Script Overlay */}
             {showScript && (
-                <div className="absolute inset-0 bg-gray-900/95 z-20 p-6 overflow-y-auto animate-fade-in">
-                    <div className="max-w-md mx-auto">
-                        <div className="flex justify-between items-center mb-6">
-                            <h3 className="text-xl font-bold">Script</h3>
-                            <button onClick={() => setShowScript(false)} className="text-gray-400 hover:text-white">Close</button>
+                <div className="absolute inset-0 bg-white/95 backdrop-blur-xl z-50 p-6 overflow-y-auto animate-fade-in flex flex-col">
+                    <div className="max-w-md mx-auto w-full flex-1">
+                        <div className="flex justify-between items-center mb-8 sticky top-0 bg-white/95 backdrop-blur-xl py-4 border-b border-gray-100">
+                            <h3 className="text-2xl font-bold text-gray-800">Transcript</h3>
+                            <button onClick={() => setShowScript(false)} className="text-gray-400 hover:text-gray-800 font-bold">Close</button>
                         </div>
-                        <div className="space-y-4 text-lg leading-relaxed">
+                        <div className="space-y-6 pb-20">
                             {playlist[currentIndex]?.segments.map((seg, i) => (
-                                <div key={i} className={`p-2 rounded ${i === currentSegmentIndex ? 'bg-indigo-900/50 border-l-4 border-indigo-500' : ''}`}>
-                                    <span className="text-xs font-bold text-gray-500 block mb-1">{seg.speaker === 'System' ? '🇯🇵' : seg.speaker === 'A' ? 'Host A' : 'Host B'}</span>
-                                    <p className={seg.lang === 'ja-JP' ? 'text-gray-300' : 'text-white'}>{seg.text}</p>
+                                <div key={i} className={`p-4 rounded-2xl transition duration-500 ${i === currentSegmentIndex ? 'bg-indigo-50 border border-indigo-100 shadow-sm scale-105' : 'opacity-70'}`}>
+                                    <span className="text-xs font-bold text-indigo-400 block mb-2 uppercase tracking-wider">{seg.speaker === 'System' ? '🇯🇵 System' : seg.speaker === 'A' ? 'Host A' : 'Host B'}</span>
+                                    <p className={`text-lg leading-relaxed ${seg.lang === 'ja-JP' ? 'text-gray-500 font-medium' : 'text-gray-800'}`}>{seg.text}</p>
                                 </div>
                             ))}
                         </div>

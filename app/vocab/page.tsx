@@ -126,96 +126,113 @@ export default function VocabPage() {
     const currentCard = reviewQueue[currentCardIndex];
 
     return (
-        <main className="min-h-screen bg-gray-50 p-4 md:p-8 flex flex-col items-center">
-            <div className="w-full max-w-2xl flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
-                <h1 className="text-2xl font-bold text-gray-800">📚 {currentSubject} Wordbook</h1>
+        <main className="min-h-screen p-4 md:p-8 relative overflow-hidden flex flex-col items-center">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-                <div className="flex items-center gap-4">
-                    {/* ★言語切り替えセレクター */}
-                    <select
-                        value={currentSubject}
-                        onChange={(e) => handleSubjectChange(e.target.value)}
-                        className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg shadow-sm outline-none focus:ring-2 focus:ring-green-500 font-bold"
-                    >
-                        {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                    <Link href="/" className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300">← 戻る</Link>
+            <div className="w-full max-w-3xl relative z-10">
+                <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+                    <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-3 tracking-tight">
+                        <span className="text-4xl">📚</span> {currentSubject} Vidnitive Wordbook
+                    </h1>
+
+                    <div className="flex items-center gap-4">
+                        {/* ★言語切り替えセレクター */}
+                        <select
+                            value={currentSubject}
+                            onChange={(e) => handleSubjectChange(e.target.value)}
+                            className="glass px-4 py-2 rounded-xl font-bold text-gray-700 outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                            {SUBJECTS.map(s => <option key={s} value={s}>{s}</option>)}
+                        </select>
+                        <Link href="/" className="glass px-6 py-2 rounded-xl font-bold text-green-600 hover:bg-white/50 transition">← Studio</Link>
+                    </div>
                 </div>
-            </div>
 
-            {/* タブ切り替え */}
-            <div className="w-full max-w-2xl flex bg-white rounded-lg shadow-sm p-1 mb-6">
-                <button onClick={() => setActiveTab('review')} className={`flex-1 py-2 rounded-md font-bold transition ${activeTab === 'review' ? 'bg-blue-100 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-                    🔥 復習 ({reviewQueue.length})
-                </button>
-                <button onClick={() => setActiveTab('list')} className={`flex-1 py-2 rounded-md font-bold transition ${activeTab === 'list' ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:bg-gray-50'}`}>
-                    📋 リスト ({vocabList.length})
-                </button>
-            </div>
-
-            {isLoading ? (
-                <div className="text-center py-10 text-gray-500">Loading words...</div>
-            ) : activeTab === 'review' ? (
-                <div className="w-full max-w-lg">
-                    {reviewFinished || reviewQueue.length === 0 ? (
-                        <div className="bg-white p-10 rounded-2xl shadow-lg text-center">
-                            <div className="text-6xl mb-4">🎉</div>
-                            <h2 className="text-2xl font-bold text-gray-800 mb-2">復習完了！</h2>
-                            <p className="text-gray-500">今日のノルマ達成です。</p>
-                            <button onClick={() => setActiveTab('list')} className="mt-6 text-blue-500 hover:underline">全リストを見る</button>
-                        </div>
-                    ) : currentCard ? (
-                        <div className="bg-white rounded-2xl shadow-xl overflow-hidden min-h-[400px] flex flex-col relative border border-gray-100">
-                            <div className="h-2 bg-gray-100 w-full">
-                                <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${((currentCardIndex) / reviewQueue.length) * 100}%` }} />
-                            </div>
-                            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-                                <p className="text-xs text-gray-400 font-bold mb-4 uppercase tracking-widest">Review Card</p>
-                                <h2 className="text-4xl md:text-5xl font-black text-gray-800 mb-6">{currentCard.word}</h2>
-                                {isFlipped ? (
-                                    <div className="animate-fade-in">
-                                        <p className="text-2xl text-blue-600 font-bold mb-2">{currentCard.translation}</p>
-                                        <p className="text-gray-400 text-sm">連続正解: {currentCard.streak}回</p>
-                                    </div>
-                                ) : (
-                                    <button onClick={() => setIsFlipped(true)} className="text-gray-400 hover:text-gray-600 border-b border-dashed border-gray-300 pb-1">タップして答えを表示</button>
-                                )}
-                            </div>
-                            <div className="p-6 bg-gray-50 border-t border-gray-100">
-                                {!isFlipped ? (
-                                    <button onClick={() => setIsFlipped(true)} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition transform hover:-translate-y-1">答えを見る</button>
-                                ) : (
-                                    <div className="flex gap-4">
-                                        <button onClick={() => handleReview('forgot')} className="flex-1 bg-red-100 text-red-600 py-4 rounded-xl font-bold hover:bg-red-200 transition">😭 忘れた</button>
-                                        <button onClick={() => handleReview('remembered')} className="flex-1 bg-green-100 text-green-700 py-4 rounded-xl font-bold hover:bg-green-200 transition">😎 覚えた</button>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    ) : null}
+                {/* タブ切り替え */}
+                <div className="w-full flex glass-card p-1 mb-8">
+                    <button onClick={() => setActiveTab('review')} className={`flex-1 py-3 rounded-lg font-bold transition-all ${activeTab === 'review' ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
+                        🔥 Review ({reviewQueue.length})
+                    </button>
+                    <button onClick={() => setActiveTab('list')} className={`flex-1 py-3 rounded-lg font-bold transition-all ${activeTab === 'list' ? 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white shadow-md' : 'text-gray-500 hover:bg-white/50'}`}>
+                        📋 List ({vocabList.length})
+                    </button>
                 </div>
-            ) : (
-                <div className="w-full max-w-2xl bg-white rounded-xl shadow-lg overflow-hidden">
-                    {vocabList.length === 0 ? (
-                        <div className="p-8 text-center text-gray-500">単語がありません。<br />動画を見て追加しましょう！</div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {vocabList.map((item) => (
-                                <div key={item.id} className="p-4 flex justify-between items-center hover:bg-gray-50">
-                                    <div>
-                                        <h3 className="text-xl font-bold text-gray-800">{item.word}</h3>
-                                        <p className="text-gray-600">{item.translation}</p>
-                                        <div className="flex gap-2 mt-1">
-                                            <span className="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded">Next: {new Date(item.next_review_at).toLocaleDateString()}</span>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 px-2">🗑</button>
+
+                {isLoading ? (
+                    <div className="text-center py-20 glass-card">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-500 mx-auto mb-4"></div>
+                        <p className="text-gray-500 font-medium">Loading words...</p>
+                    </div>
+                ) : activeTab === 'review' ? (
+                    <div className="w-full">
+                        {reviewFinished || reviewQueue.length === 0 ? (
+                            <div className="glass-card p-12 text-center">
+                                <div className="text-7xl mb-6 animate-bounce">🎉</div>
+                                <h2 className="text-3xl font-bold text-gray-800 mb-3">All Caught Up!</h2>
+                                <p className="text-gray-500 text-lg mb-8">You've finished your reviews for now.</p>
+                                <button onClick={() => setActiveTab('list')} className="text-blue-600 font-bold hover:text-blue-800 transition">View All Words →</button>
+                            </div>
+                        ) : currentCard ? (
+                            <div className="glass-card overflow-hidden min-h-[450px] flex flex-col relative border-0 shadow-2xl">
+                                <div className="h-2 bg-gray-100/50 w-full">
+                                    <div className="h-full bg-gradient-to-r from-green-400 to-emerald-500 transition-all duration-300" style={{ width: `${((currentCardIndex) / reviewQueue.length) * 100}%` }} />
                                 </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
+                                <div className="flex-1 flex flex-col items-center justify-center p-10 text-center relative">
+                                    <p className="text-xs text-gray-400 font-bold mb-6 uppercase tracking-widest bg-white/50 px-3 py-1 rounded-full">Review Card</p>
+                                    <h2 className="text-5xl md:text-6xl font-black text-gray-800 mb-8 tracking-tight">{currentCard.word}</h2>
+
+                                    {isFlipped ? (
+                                        <div className="animate-fade-in w-full">
+                                            <div className="bg-green-50/50 p-6 rounded-2xl border border-green-100 mb-4">
+                                                <p className="text-3xl text-green-700 font-bold">{currentCard.translation}</p>
+                                            </div>
+                                            <p className="text-gray-400 text-sm font-medium">Streak: {currentCard.streak} 🔥</p>
+                                        </div>
+                                    ) : (
+                                        <button onClick={() => setIsFlipped(true)} className="text-gray-400 hover:text-green-600 border-b-2 border-dashed border-gray-300 hover:border-green-400 pb-1 transition-all font-medium">Tap to flip</button>
+                                    )}
+                                </div>
+                                <div className="p-6 bg-white/40 border-t border-white/20 backdrop-blur-sm">
+                                    {!isFlipped ? (
+                                        <button onClick={() => setIsFlipped(true)} className="w-full bg-gradient-to-r from-green-500 to-emerald-600 text-white py-4 rounded-xl font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all">Show Answer</button>
+                                    ) : (
+                                        <div className="flex gap-4">
+                                            <button onClick={() => handleReview('forgot')} className="flex-1 bg-red-100 text-red-600 py-4 rounded-xl font-bold hover:bg-red-200 transition shadow-sm">😭 Forgot</button>
+                                            <button onClick={() => handleReview('remembered')} className="flex-1 bg-green-100 text-green-700 py-4 rounded-xl font-bold hover:bg-green-200 transition shadow-sm">😎 Remembered</button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ) : null}
+                    </div>
+                ) : (
+                    <div className="w-full glass-card overflow-hidden">
+                        {vocabList.length === 0 ? (
+                            <div className="p-12 text-center text-gray-500">
+                                <p className="text-xl font-bold mb-2">No words yet</p>
+                                <p>Watch videos to add new vocabulary!</p>
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-gray-100">
+                                {vocabList.map((item) => (
+                                    <div key={item.id} className="p-5 flex justify-between items-center hover:bg-white/40 transition group">
+                                        <div>
+                                            <h3 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition">{item.word}</h3>
+                                            <p className="text-gray-600 font-medium">{item.translation}</p>
+                                            <div className="flex gap-2 mt-2">
+                                                <span className="text-xs bg-gray-100 text-gray-500 px-2 py-1 rounded font-bold">Next: {new Date(item.next_review_at).toLocaleDateString()}</span>
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDelete(item.id)} className="text-gray-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition">🗑</button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
         </main>
     );
 }

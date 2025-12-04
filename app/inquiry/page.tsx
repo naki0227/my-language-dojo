@@ -39,46 +39,61 @@ export default function InquiryPage() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-50 p-8 flex flex-col items-center">
-            <div className="w-full max-w-lg bg-white rounded-xl shadow-lg p-8">
-                <h1 className="text-2xl font-bold text-gray-800 mb-6">📮 お問い合わせ</h1>
+        <main className="min-h-screen p-4 md:p-8 relative overflow-hidden flex flex-col items-center justify-center">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-300 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
 
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">カテゴリ</label>
-                        <select
-                            value={category}
-                            onChange={(e) => setCategory(e.target.value)}
-                            className="w-full p-3 border rounded-lg bg-white text-black"
+            <div className="w-full max-w-lg relative z-10">
+                <div className="glass-card p-8">
+                    <h1 className="text-3xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span className="text-4xl">📮</span> Contact Vidnitive
+                    </h1>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div>
+                            <label className="block text-sm font-bold text-gray-600 mb-2 uppercase tracking-wider">Category</label>
+                            <div className="relative">
+                                <select
+                                    value={category}
+                                    onChange={(e) => setCategory(e.target.value)}
+                                    className="w-full p-4 rounded-xl bg-white/50 border border-white/20 font-bold text-gray-700 focus:ring-2 focus:ring-blue-400 outline-none appearance-none transition"
+                                >
+                                    <option value="request">✨ Feature Request</option>
+                                    <option value="bug">🐛 Bug Report</option>
+                                    <option value="other">🤔 Other</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 transform -translate-y-1/2 pointer-events-none text-gray-500">
+                                    ▼
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-bold text-gray-600 mb-2 uppercase tracking-wider">Message</label>
+                            <textarea
+                                required
+                                value={message}
+                                onChange={(e) => setMessage(e.target.value)}
+                                className="w-full h-40 p-4 rounded-xl bg-white/50 border border-white/20 outline-none focus:ring-2 focus:ring-blue-400 text-gray-800 placeholder-gray-400 resize-none transition"
+                                placeholder="How can we help you?"
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={isSubmitting || !message}
+                            className={`w-full py-4 rounded-xl font-bold text-white shadow-lg transition transform hover:scale-[1.02]
+                    ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:shadow-xl'}
+                  `}
                         >
-                            <option value="request">✨ 機能の要望</option>
-                            <option value="bug">🐛 バグ報告</option>
-                            <option value="other">🤔 その他</option>
-                        </select>
+                            {isSubmitting ? 'Sending...' : 'Send Message'}
+                        </button>
+                    </form>
+
+                    <div className="mt-8 text-center">
+                        <Link href="/" className="text-gray-500 hover:text-blue-600 font-bold transition text-sm">Cancel & Return to Studio</Link>
                     </div>
-
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-1">メッセージ</label>
-                        <textarea
-                            required
-                            value={message}
-                            onChange={(e) => setMessage(e.target.value)}
-                            className="w-full h-40 p-3 border rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-black"
-                            placeholder="ここに入力してください..."
-                        />
-                    </div>
-
-                    <button
-                        type="submit"
-                        disabled={isSubmitting || !message}
-                        className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold hover:bg-blue-700 disabled:bg-gray-300 transition"
-                    >
-                        {isSubmitting ? '送信中...' : '送信する'}
-                    </button>
-                </form>
-
-                <div className="mt-6 text-center">
-                    <Link href="/" className="text-gray-500 hover:text-gray-800 text-sm">キャンセルして戻る</Link>
                 </div>
             </div>
         </main>

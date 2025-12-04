@@ -13,6 +13,7 @@
     "@mdx-js/loader": "^3.1.1",
     "@mdx-js/react": "^3.1.1",
     "@next/mdx": "^16.0.3",
+    "@stripe/stripe-js": "^8.5.3",
     "@supabase/supabase-js": "^2.84.0",
     "@types/mdx": "^2.0.13",
     "lucide-react": "^0.554.0",
@@ -22,6 +23,7 @@
     "react-markdown": "^10.1.0",
     "react-youtube": "^10.1.0",
     "recharts": "^3.5.0",
+    "stripe": "^20.0.0",
     "youtube-transcript": "^1.2.1",
     "youtubei.js": "^16.0.1"
   },

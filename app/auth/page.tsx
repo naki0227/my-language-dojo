@@ -59,7 +59,6 @@ export default function AuthPage() {
     };
 
     return (
-    return (
         <main className="min-h-screen flex items-center justify-center p-4">
             <div className="glass p-8 rounded-2xl shadow-2xl w-full max-w-md animate-fade-in relative overflow-hidden">
                 {/* Decorative background blob */}

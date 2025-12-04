@@ -110,22 +110,26 @@ export default function TypeTalkPage() {
     };
 
     return (
-        <main className="min-h-screen bg-gray-900 text-white flex flex-col font-sans">
+        <main className="min-h-screen bg-gray-900 text-white flex flex-col font-sans relative overflow-hidden">
+            {/* Decorative blobs */}
+            <div className="fixed -top-40 -right-40 w-96 h-96 bg-purple-900/30 rounded-full mix-blend-screen filter blur-3xl opacity-30 animate-blob pointer-events-none"></div>
+            <div className="fixed top-40 -left-40 w-96 h-96 bg-indigo-900/30 rounded-full mix-blend-screen filter blur-3xl opacity-30 animate-blob animation-delay-2000 pointer-events-none"></div>
+
             {/* ヘッダー */}
-            <div className="p-4 border-b border-gray-700 flex justify-between items-center bg-gray-800 shadow-md shrink-0">
-                <h1 className="text-xl font-bold flex items-center gap-2 text-yellow-400">
-                    <Zap className="fill-current" /> TypeTalk Dojo
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 backdrop-blur-md shadow-md shrink-0 z-10">
+                <h1 className="text-xl font-bold flex items-center gap-2 text-yellow-400 tracking-tight">
+                    <Zap className="fill-current" /> Vidnitive TypeTalk
                 </h1>
-                <Link href="/" className="text-gray-400 text-sm hover:text-white">Exit</Link>
+                <Link href="/" className="text-gray-400 text-sm hover:text-white transition font-bold">Exit</Link>
             </div>
 
             {/* トピック選択 */}
-            <div className="p-3 bg-gray-800 border-b border-gray-700 overflow-x-auto flex gap-2 scrollbar-hide shrink-0">
+            <div className="p-3 border-b border-white/5 overflow-x-auto flex gap-2 scrollbar-hide shrink-0 z-10 bg-black/20 backdrop-blur-sm">
                 {TOPICS.map(t => (
                     <button
                         key={t} onClick={() => setTopic(t)}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors
-                ${topic === t ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-all shadow-sm
+                ${topic === t ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105' : 'bg-white/10 text-gray-300 hover:bg-white/20'}`}
                     >
                         {t}
                     </button>
@@ -133,27 +137,27 @@ export default function TypeTalkPage() {
             </div>
 
             {/* チャットエリア */}
-            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth">
+            <div ref={chatContainerRef} className="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth z-10">
                 {messages.map((m, i) => (
                     <div key={i} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'} animate-slide-up`}>
                         {/* ★修正: 改行コードを反映させるスタイル (whitespace-pre-wrap) */}
-                        <div className={`max-w-[85%] p-4 rounded-2xl text-base leading-relaxed shadow-sm whitespace-pre-wrap
-                ${m.role === 'user' ? 'bg-blue-600 text-white rounded-br-none' : 'bg-gray-700 text-gray-100 rounded-bl-none'}`}>
+                        <div className={`max-w-[85%] p-4 rounded-2xl text-base leading-relaxed shadow-lg whitespace-pre-wrap backdrop-blur-sm
+                ${m.role === 'user' ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white rounded-br-none border border-white/10' : 'bg-white/10 text-gray-100 rounded-bl-none border border-white/5'}`}>
                             {m.text}
                         </div>
 
                         {/* スコアカード */}
                         {m.role === 'ai' && m.score && (
-                            <div className="mt-3 bg-gray-800/80 p-3 rounded-xl border border-gray-600 text-xs w-full max-w-xs animate-fade-in backdrop-blur-sm">
-                                <div className="flex justify-between mb-2 border-b border-gray-600/50 pb-1">
-                                    <span className="text-yellow-400 font-bold flex items-center gap-1"><Award size={14} /> Review</span>
+                            <div className="mt-3 bg-black/40 p-4 rounded-xl border border-white/10 text-xs w-full max-w-xs animate-fade-in backdrop-blur-md shadow-xl">
+                                <div className="flex justify-between mb-3 border-b border-white/10 pb-2">
+                                    <span className="text-yellow-400 font-bold flex items-center gap-1 text-sm"><Award size={16} /> Review</span>
                                 </div>
-                                <div className="grid grid-cols-3 gap-2 mb-2 text-center">
-                                    <div><div className="text-[10px] text-gray-400 mb-0.5">SPEED</div><div className={`font-black text-sm ${m.score.speed >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.speed}/5</div></div>
-                                    <div><div className="text-[10px] text-gray-400 mb-0.5">GRAMMAR</div><div className={`font-black text-sm ${m.score.grammar >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.grammar}/5</div></div>
-                                    <div><div className="text-[10px] text-gray-400 mb-0.5">NATURAL</div><div className={`font-black text-sm ${m.score.naturalness >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.naturalness}/5</div></div>
+                                <div className="grid grid-cols-3 gap-3 mb-3 text-center">
+                                    <div className="bg-white/5 rounded-lg p-2"><div className="text-[10px] text-gray-400 mb-1 font-bold">SPEED</div><div className={`font-black text-lg ${m.score.speed >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.speed}/5</div></div>
+                                    <div className="bg-white/5 rounded-lg p-2"><div className="text-[10px] text-gray-400 mb-1 font-bold">GRAMMAR</div><div className={`font-black text-lg ${m.score.grammar >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.grammar}/5</div></div>
+                                    <div className="bg-white/5 rounded-lg p-2"><div className="text-[10px] text-gray-400 mb-1 font-bold">NATURAL</div><div className={`font-black text-lg ${m.score.naturalness >= 4 ? 'text-green-400' : 'text-yellow-400'}`}>{m.score.naturalness}/5</div></div>
                                 </div>
-                                {m.feedback && <p className="text-gray-300 border-t border-gray-600/50 pt-2 mt-1">💡 {m.feedback}</p>}
+                                {m.feedback && <p className="text-gray-300 border-t border-white/10 pt-2 mt-1 leading-relaxed">💡 {m.feedback}</p>}
                             </div>
                         )}
                     </div>
@@ -167,24 +171,24 @@ export default function TypeTalkPage() {
             </div>
 
             {/* 入力エリア */}
-            <div className="p-4 bg-gray-800 border-t border-gray-700 pb-8 md:pb-4 shrink-0">
+            <div className="p-4 border-t border-white/10 pb-8 md:pb-4 shrink-0 z-20 bg-black/40 backdrop-blur-xl">
                 {showHint && !loading && (
                     <div className="mb-3 text-center animate-bounce-in">
-                        <span className="bg-yellow-900/50 text-yellow-300 text-xs px-3 py-1 rounded-full border border-yellow-700/50 inline-block">
+                        <span className="bg-yellow-900/80 text-yellow-300 text-xs px-4 py-2 rounded-full border border-yellow-500/30 inline-block shadow-lg backdrop-blur-sm font-bold">
                             💡 Hint: 何も思いつかない？ "How about you?" と聞いてみよう！
                         </span>
                     </div>
                 )}
 
                 {/* ★修正: items-end でボタンと入力欄の下端を揃える */}
-                <form onSubmit={handleSend} className="flex gap-2 relative items-end">
+                <form onSubmit={handleSend} className="flex gap-3 relative items-end max-w-4xl mx-auto">
                     {/* ★修正: textareaに変更 */}
                     <textarea
                         ref={inputRef}
                         value={input}
                         onChange={handleInputChange}
                         placeholder="Type here..."
-                        className="flex-1 bg-gray-900 border border-gray-600 text-white p-4 rounded-xl focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all resize-none"
+                        className="flex-1 bg-white/10 border border-white/10 text-white p-4 rounded-2xl focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50 transition-all resize-none placeholder-gray-500 backdrop-blur-sm"
                         rows={1}
                         style={{ minHeight: '56px', maxHeight: '150px' }}
                         autoFocus
@@ -192,14 +196,14 @@ export default function TypeTalkPage() {
                     <button
                         type="submit"
                         disabled={!input || loading}
-                        className="bg-blue-600 hover:bg-blue-500 text-white p-4 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg h-[56px] flex items-center justify-center"
+                        className="bg-gradient-to-br from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white p-4 rounded-2xl disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-blue-500/30 h-[56px] flex items-center justify-center w-[56px]"
                     >
                         <Send size={24} />
                     </button>
 
                     {startTime && (
-                        <div className="absolute -top-8 right-2 bg-black/60 text-white text-xs px-2 py-1 rounded font-mono flex items-center gap-1 backdrop-blur-sm">
-                            <Clock size={12} /> {((Date.now() - startTime) / 1000).toFixed(1)}s
+                        <div className="absolute -top-10 right-0 bg-black/60 text-white text-xs px-3 py-1.5 rounded-full font-mono flex items-center gap-2 backdrop-blur-md border border-white/10 shadow-lg">
+                            <Clock size={12} className="text-blue-400" /> <span className="font-bold text-blue-200">{((Date.now() - startTime) / 1000).toFixed(1)}s</span>
                         </div>
                     )}
                 </form>
