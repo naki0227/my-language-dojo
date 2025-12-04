@@ -30,9 +30,6 @@ export const VideoPlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playErro
                                 console.warn("YouTube Player Error:", e.data);
                                 setPlayError(true);
                             }
-                        },
-                        playerVars: {
-                            origin: 'https://enludus.vercel.app'
                         }
                     });
                 } catch (e) {
@@ -76,11 +73,12 @@ export const VideoPlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playErro
                     id="youtube-player"
                     width="100%"
                     height="100%"
-                    src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1&origin=https://enludus.vercel.app`}
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1`}
                     title="YouTube video player"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
+                    referrerPolicy="strict-origin-when-cross-origin"
                     className="w-full h-full"
                 />
             )}
