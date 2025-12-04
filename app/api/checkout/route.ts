@@ -2,9 +2,11 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { supabase } from '@/lib/supabase';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2025-11-17.clover',
-});
+const stripe = process.env.STRIPE_SECRET_KEY
+    ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2025-11-17.clover',
+    })
+    : null;
 
 export async function POST(req: Request) {
     try {
@@ -21,6 +23,10 @@ export async function POST(req: Request) {
         }
 
         // 2. Create Checkout Session
+        if (!stripe) {
+            console.error('Stripe is not configured.');
+            return NextResponse.json({ error: 'Stripe is not configured' }, { status: 500 });
+        }
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [

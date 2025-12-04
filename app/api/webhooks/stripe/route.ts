@@ -3,9 +3,11 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-    apiVersion: '2025-11-17.clover',
-});
+const stripe = process.env.STRIPE_SECRET_KEY
+    ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+        apiVersion: '2025-11-17.clover',
+    })
+    : null;
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
@@ -22,6 +24,7 @@ export async function POST(req: Request) {
     let event: Stripe.Event;
 
     try {
+        if (!stripe) throw new Error('Stripe is not configured');
         event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err: any) {
         console.error(`Webhook signature verification failed.`, err.message);
