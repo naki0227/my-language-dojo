@@ -12,10 +12,12 @@ const stripe = process.env.STRIPE_SECRET_KEY
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
 // Initialize Supabase Service Client (Bypasses RLS)
-const supabaseAdmin = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+const supabaseAdmin = process.env.SUPABASE_SERVICE_ROLE_KEY
+    ? createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY
+    )
+    : null;
 
 export async function POST(req: Request) {
     const body = await req.text();
@@ -40,6 +42,11 @@ export async function POST(req: Request) {
             console.log(`Payment successful for user: ${userId}`);
 
             // Update user profile to Pro
+            if (!supabaseAdmin) {
+                console.error('Supabase Admin is not configured');
+                return NextResponse.json({ error: 'Database configuration missing' }, { status: 500 });
+            }
+
             const { error } = await supabaseAdmin
                 .from('profiles')
                 .update({ is_pro: true })
