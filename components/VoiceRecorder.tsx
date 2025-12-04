@@ -2,13 +2,9 @@
 'use client';
 
 import { useState, useRef } from 'react';
-
-// お手本のテキストを受け取るための型定義
-type Props = {
-    targetText: string; // ← 親から受け取る「今練習すべき文章」
-};
-
+import { Mic, Square, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { getApiUrl } from '@/lib/api';
+import { supabase } from '@/lib/supabase';
 
 export default function VoiceRecorder({ targetText }: { targetText: string }) {
     const [isRecording, setIsRecording] = useState(false);
@@ -60,21 +56,50 @@ export default function VoiceRecorder({ targetText }: { targetText: string }) {
         if (!audioBlob || !targetText) return;
 
         setIsGrading(true);
-        const formData = new FormData();
-        formData.append('audio', audioBlob);
-        formData.append('text', targetText);
 
         try {
-            const res = await fetch(getApiUrl('/api/grade'), {
-                method: 'POST',
-                body: formData,
-            });
-            const data = await res.json();
-            setResult(data);
-        } catch (e) {
-            alert('採点に失敗しました');
-        } finally {
-            setIsGrading(false);
+            // Convert audio blob to base64
+            const reader = new FileReader();
+            reader.readAsDataURL(audioBlob);
+            reader.onloadend = async () => {
+                const base64Audio = reader.result?.toString().split(',')[1]; // Get base64 string without data:audio/webm;base64, prefix
+
+                if (!base64Audio) {
+                    alert('音声データの変換に失敗しました');
+                    setIsGrading(false);
+                    return;
+                }
+
+                const { data: { session } } = await supabase.auth.getSession();
+                const token = session?.access_token;
+
+                const res = await fetch(getApiUrl('/api/grade'), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                    },
+                    body: JSON.stringify({
+                        targetText,
+                        audioData: base64Audio // Send base64 audio data
+                    })
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.message || '採点に失敗しました');
+                }
+
+                const data = await res.json();
+                setResult(data);
+                setIsGrading(false); // Moved here to ensure it's called after processing
+            };
+            reader.onerror = () => {
+                throw new Error('音声ファイルの読み込みに失敗しました');
+            };
+        } catch (e: any) {
+            alert(`採点に失敗しました: ${e.message}`);
+            setIsGrading(false); // Ensure grading state is reset on error
         }
     };
 
@@ -98,16 +123,16 @@ export default function VoiceRecorder({ targetText }: { targetText: string }) {
                         disabled={!targetText}
                         className={`w-16 h-16 rounded-full flex items-center justify-center shadow-lg transition text-2xl text-white
               ${targetText ? 'bg-red-500 hover:bg-red-600 hover:scale-110' : 'bg-gray-300 cursor-not-allowed'}
-            `}
+`}
                     >
-                        🎙️
+                        <Mic size={32} />
                     </button>
                 ) : (
                     <button
                         onClick={stopRecording}
                         className="bg-gray-800 text-white w-16 h-16 rounded-full flex items-center justify-center shadow-lg animate-pulse text-2xl"
                     >
-                        ⏹️
+                        <Square size={32} />
                     </button>
                 )}
             </div>
@@ -123,7 +148,7 @@ export default function VoiceRecorder({ targetText }: { targetText: string }) {
                         className="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 rounded-lg font-bold shadow-lg hover:opacity-90 transition flex justify-center items-center gap-2"
                     >
                         {isGrading ? (
-                            <><span>思考中...</span><div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div></>
+                            <><span>思考中...</span><Loader2 className="animate-spin h-4 w-4" /></>
                         ) : (
                             '🤖 AI採点スタート (Check Pronunciation)'
                         )}
