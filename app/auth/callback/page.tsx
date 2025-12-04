@@ -8,16 +8,32 @@ export default function AuthCallbackPage() {
     const router = useRouter();
 
     useEffect(() => {
+        // ハッシュフラグメントがあるかチェック
+        // SupabaseのOAuthリダイレクトは通常ハッシュにトークンを含みます
         const handleAuthCallback = async () => {
-            const { error } = await supabase.auth.getSession();
+            // セッションの確立を待つ
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+                if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+                    // ログイン成功
+                    router.push('/');
+                    router.refresh();
+                }
+            });
+
+            // 万が一イベントが発火しない場合のために、手動でもチェック
+            const { data: { session }, error } = await supabase.auth.getSession();
             if (error) {
                 console.error('Error getting session:', error);
-                alert('認証エラーが発生しました: ' + error.message);
+                // エラー表示はユーザー体験を損なう可能性があるため、コンソールのみにしてリダイレクトを試みる
             }
-            // 成功しても失敗してもトップページへリダイレクト
-            // セッションがあればミドルウェアや保護されたページで処理される
-            router.push('/');
-            router.refresh();
+            if (session) {
+                router.push('/');
+                router.refresh();
+            }
+
+            return () => {
+                subscription.unsubscribe();
+            };
         };
 
         handleAuthCallback();
