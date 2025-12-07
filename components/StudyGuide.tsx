@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { SUPPORTED_LANGUAGES } from '@/lib/constants';
 import { supabase } from '@/lib/supabase';
 import { UserProfile, DictionaryData } from '@/types';
@@ -306,25 +307,110 @@ export const StudyGuide = ({
                                     {explanationLangs.map(lang => {
                                         const guide = studyGuides[lang];
                                         if (!guide?.quiz) return null;
+
+                                        // eslint-disable-next-line react-hooks/rules-of-hooks
+                                        const [selectedAnswers, setSelectedAnswers] = useState<Record<number, string>>({});
+                                        // eslint-disable-next-line react-hooks/rules-of-hooks
+                                        const [showResults, setShowResults] = useState(false);
+                                        // eslint-disable-next-line react-hooks/rules-of-hooks
+                                        const [score, setScore] = useState(0);
+
+                                        const handleOptionSelect = (qIndex: number, option: string) => {
+                                            if (showResults) return;
+                                            setSelectedAnswers(prev => ({ ...prev, [qIndex]: option }));
+                                        };
+
+                                        const handleSubmit = () => {
+                                            let correctCount = 0;
+                                            guide.quiz.forEach((q: any, i: number) => {
+                                                if (selectedAnswers[i] === q.answer) correctCount++;
+                                            });
+                                            setScore(correctCount);
+                                            setShowResults(true);
+
+                                            // Add XP if all correct (or some threshold)
+                                            if (correctCount > 0) {
+                                                addXp(correctCount * 5); // 5 XP per correct answer
+                                            }
+                                        };
+
                                         return (
                                             <div key={lang} className={`p-4 rounded-xl border ${isPro ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
                                                 <h4 className="font-bold text-sm mb-4 opacity-70 flex items-center gap-2 border-b border-gray-700 pb-2">
                                                     {SUPPORTED_LANGUAGES.find(l => l.dbName === lang)?.label}
                                                 </h4>
                                                 <div className="space-y-6">
-                                                    {guide.quiz.map((q: any, i: number) => (
-                                                        <div key={i} className="text-sm">
-                                                            <p className={`font-bold mb-2 text-base ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
-                                                            <div className="pl-2 space-y-2">
-                                                                {q.options?.map((opt: string, oi: number) => (
-                                                                    <div key={oi} className={`p-2 rounded border ${isPro ? 'border-gray-700 bg-gray-900/50 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600'}`}>
-                                                                        {opt === q.answer ? '✅' : '⚪️'} {opt}
-                                                                    </div>
-                                                                ))}
+                                                    {guide.quiz.map((q: any, i: number) => {
+                                                        const isCorrect = selectedAnswers[i] === q.answer;
+                                                        const isSelected = selectedAnswers[i] !== undefined;
+
+                                                        return (
+                                                            <div key={i} className="text-sm">
+                                                                <p className={`font-bold mb-2 text-base ${isPro ? 'text-gray-200' : 'text-gray-800'}`}>Q{i + 1}. {q.question}</p>
+                                                                <div className="pl-2 space-y-2">
+                                                                    {q.options?.map((opt: string, oi: number) => {
+                                                                        const isSelectedOption = selectedAnswers[i] === opt;
+                                                                        const isCorrectOption = opt === q.answer;
+
+                                                                        let btnClass = isPro ? 'border-gray-700 bg-gray-900/50 text-gray-400' : 'border-gray-200 bg-gray-50 text-gray-600';
+
+                                                                        if (showResults) {
+                                                                            if (isCorrectOption) btnClass = 'bg-green-100 border-green-500 text-green-800 font-bold';
+                                                                            else if (isSelectedOption && !isCorrectOption) btnClass = 'bg-red-100 border-red-500 text-red-800';
+                                                                        } else {
+                                                                            if (isSelectedOption) btnClass = 'bg-blue-100 border-blue-500 text-blue-800 font-bold ring-2 ring-blue-200';
+                                                                            else btnClass += ' hover:bg-gray-100 cursor-pointer';
+                                                                        }
+
+                                                                        return (
+                                                                            <div
+                                                                                key={oi}
+                                                                                onClick={() => handleOptionSelect(i, opt)}
+                                                                                className={`p-3 rounded border transition-all ${btnClass}`}
+                                                                            >
+                                                                                <div className="flex justify-between items-center">
+                                                                                    <span>{opt}</span>
+                                                                                    {showResults && isCorrectOption && <span>✅</span>}
+                                                                                    {showResults && isSelectedOption && !isCorrectOption && <span>❌</span>}
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
                                                             </div>
-                                                        </div>
-                                                    ))}
+                                                        );
+                                                    })}
                                                 </div>
+
+                                                {!showResults ? (
+                                                    <button
+                                                        onClick={handleSubmit}
+                                                        disabled={Object.keys(selectedAnswers).length < guide.quiz.length}
+                                                        className={`mt-6 w-full py-3 rounded-lg font-bold text-white transition ${Object.keys(selectedAnswers).length < guide.quiz.length ? 'bg-gray-400 cursor-not-allowed' : 'bg-gradient-to-r from-orange-500 to-red-500 hover:scale-[1.02] shadow-lg'}`}
+                                                    >
+                                                        Check Answers
+                                                    </button>
+                                                ) : (
+                                                    <div className="mt-6 p-4 bg-gray-900/50 rounded-lg text-center animate-bounce-in">
+                                                        <p className="text-gray-400 text-xs uppercase tracking-widest mb-1">Result</p>
+                                                        <p className="text-3xl font-black text-white mb-2">
+                                                            {score} / {guide.quiz.length}
+                                                        </p>
+                                                        <p className="text-sm text-gray-300">
+                                                            {score === guide.quiz.length ? '🎉 Perfect! +' + (score * 5) + ' XP' : 'Keep trying!'}
+                                                        </p>
+                                                        <button
+                                                            onClick={() => {
+                                                                setShowResults(false);
+                                                                setSelectedAnswers({});
+                                                                setScore(0);
+                                                            }}
+                                                            className="mt-4 text-xs text-gray-500 underline hover:text-white"
+                                                        >
+                                                            Try Again
+                                                        </button>
+                                                    </div>
+                                                )}
                                             </div>
                                         );
                                     })}

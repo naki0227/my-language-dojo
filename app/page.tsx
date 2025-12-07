@@ -75,7 +75,7 @@ function HomeContent() {
   const [isCheckingSummary, setIsCheckingSummary] = useState(false);
   const [showModelSummary, setShowModelSummary] = useState(false);
 
-  const [videoId, setVideoId] = useState(initialVideoId);
+  const [videoId, setVideoId] = useState<string>('arj7oStGLkU');
   const [subtitles, setSubtitles] = useState<Subtitle[]>([]);
   const [studyGuides, setStudyGuides] = useState<Record<string, any>>({}); // Map of guides
   const playerRef = useRef<any | null>(null);
@@ -220,12 +220,22 @@ function HomeContent() {
           body: JSON.stringify({ videoId: id, subject: userProfile.learning_target, explanationLang: lang })
         });
         console.log(`[Frontend] API Status (${lang}): ${genRes.status}`);
-        const genData = await genRes.json();
+        const rawText = await genRes.text();
+        console.log(`[Frontend] API Raw Response (${lang}):`, rawText);
+
+        let genData;
+        try {
+          genData = JSON.parse(rawText);
+        } catch (e) {
+          console.error(`[Frontend] Failed to parse JSON for ${lang}:`, e);
+          return { lang, error: 'Invalid JSON response' };
+        }
+
         if (genData.success && genData.data) {
           return { lang, data: genData.data };
         } else {
           console.error(`Failed to auto-generate guide for ${lang}:`, genData);
-          return { lang, error: genData.error };
+          return { lang, error: genData.error || 'Unknown API error' };
         }
       } catch (e) {
         console.error(`Auto-gen error for ${lang}`, e);
@@ -817,7 +827,7 @@ function HomeContent() {
 
       {/* Footer */}
       <div className={`shrink-0 w-full p-4 border-t text-center text-xs text-gray-400 ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
-        <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Information Student</a>.</p>
+        <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Enludus</a>.</p>
       </div>
       <LoginRequiredModal
         isOpen={isLoginModalOpen}

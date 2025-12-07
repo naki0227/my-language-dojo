@@ -106,20 +106,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         });
 
-        // Safety timeout: If Supabase doesn't respond in 3s, fallback to guest
-        const safetyTimeout = setTimeout(() => {
-            if (mounted) {
-                console.warn('AuthProvider: Auth check timed out, falling back to guest');
-                setUser(null);
-                setProfile(guestProfile);
-                setLevelData(guestLevelData);
-                setLoading(false);
+        // Initial session check
+        const initAuth = async () => {
+            try {
+                const { data: { session }, error } = await supabase.auth.getSession();
+                if (error) {
+                    console.error("Auth session error:", error);
+                    if (error.message.includes("Refresh Token")) {
+                        console.warn("Invalid refresh token, signing out...");
+                        await supabase.auth.signOut();
+                        if (mounted) {
+                            setUser(null);
+                            setProfile(guestProfile);
+                            setLevelData(guestLevelData);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error("Unexpected auth error:", e);
             }
-        }, 3000);
+        };
+        initAuth();
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return;
-            clearTimeout(safetyTimeout);
+
+            console.log(`Auth state changed: ${event}`);
 
             if (session) {
                 setUser(session.user);
@@ -139,7 +151,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return () => {
             mounted = false;
-            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
             App.removeAllListeners();
         };

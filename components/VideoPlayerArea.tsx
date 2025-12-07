@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertCircle, ExternalLink, HelpCircle } from 'lucide-react';
 
 interface PlayerAreaProps {
@@ -11,7 +11,12 @@ interface PlayerAreaProps {
 }
 
 export const VideoPlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playError, setPlayError, onPlayerReady }: PlayerAreaProps) => {
+    const [origin, setOrigin] = useState('');
     const playerRef = useRef<any | null>(null);
+
+    useEffect(() => {
+        setOrigin(window.location.origin);
+    }, []);
 
     useEffect(() => {
         if (playError || isAudioOnly) return;
@@ -73,12 +78,11 @@ export const VideoPlayerArea = ({ videoId, isAudioOnly, setIsAudioOnly, playErro
                     id="youtube-player"
                     width="100%"
                     height="100%"
-                    src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1`}
+                    src={`https://www.youtube.com/embed/${videoId}?autoplay=0&enablejsapi=1&origin=${origin}`}
                     title="YouTube video player"
                     frameBorder="0"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                     allowFullScreen
-                    referrerPolicy="strict-origin-when-cross-origin"
                     className="w-full h-full"
                 />
             )}
