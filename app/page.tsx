@@ -827,6 +827,13 @@ function HomeContent() {
 
       {/* Footer */}
       <div className={`shrink-0 w-full p-4 border-t text-center text-xs text-gray-400 ${isPro ? 'bg-gray-900 border-gray-800' : 'bg-white border-gray-200'}`}>
+        <div className="space-x-4 mb-2">
+          <Link href="/privacy" className="hover:underline">Privacy Policy</Link>
+          <span>|</span>
+          <Link href="/terms" className="hover:underline">Terms of Service</Link>
+          <span>|</span>
+          <a href="https://ofuse.me/292a29e6" target="_blank" rel="noopener noreferrer" className="hover:underline">Ofuse</a>
+        </div>
         <p>© 2025 Vidnitive. Created with ❤️ by <a href="#" className="hover:underline">Enludus</a>.</p>
       </div>
       <LoginRequiredModal
