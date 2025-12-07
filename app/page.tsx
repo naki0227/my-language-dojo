@@ -45,7 +45,7 @@ function HomeContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const paramVideoId = searchParams.get('videoId');
-  const initialVideoId = 'hHW1oY26kxQ';
+  const initialVideoId = 'arj7oStGLkU';
 
   const { user, profile, levelData, loading, signOut, updateProfile, updateLevelData } = useAuth();
   const userId = user?.id || null;
