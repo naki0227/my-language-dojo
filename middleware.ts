@@ -9,6 +9,7 @@ export function middleware(request: NextRequest) {
         'capacitor://localhost',
         'http://localhost',
         'https://enludus.vercel.app',
+        'https://my-language-dojo-l8cl.vercel.app',
         'http://localhost:3000'
     ]
 

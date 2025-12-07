@@ -11,7 +11,7 @@ export const getApiBaseUrl = () => {
     }
 
     // In production (Vercel), use relative path or absolute if needed
-    return process.env.NEXT_PUBLIC_API_URL || 'https://enludus.vercel.app';
+    return process.env.NEXT_PUBLIC_API_URL || '';
 };
 
 export const getApiUrl = (path: string) => {
