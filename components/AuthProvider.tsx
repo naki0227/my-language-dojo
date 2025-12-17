@@ -128,8 +128,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         initAuth();
 
+        // Safety timeout: If auth check doesn't complete in 5 seconds, fallback to guest
+        const safetyTimeout = setTimeout(() => {
+            if (mounted) {
+                console.warn('AuthProvider: Auth check timed out, falling back to guest');
+                setLoading(false);
+            }
+        }, 5000);
+
         const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
             if (!mounted) return;
+            clearTimeout(safetyTimeout); // Clear timeout when auth responds
 
             console.log(`Auth state changed: ${event}`);
 
@@ -151,6 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
         return () => {
             mounted = false;
+            clearTimeout(safetyTimeout);
             subscription.unsubscribe();
             App.removeAllListeners();
         };
