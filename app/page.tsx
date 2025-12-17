@@ -500,7 +500,15 @@ function HomeContent() {
     }
   };
 
-  if (loading || !mounted) return <div className="p-10 text-center">Loading...</div>;
+  // Debug loading state
+  useEffect(() => {
+    console.log('[DEBUG] Loading state:', { loading, mounted });
+  }, [loading, mounted]);
+
+  if (loading || !mounted) {
+    console.log('[DEBUG] Showing Loading... because:', { loading, mounted });
+    return <div className="p-10 text-center">Loading...</div>;
+  }
   const isPro = userProfile.theme === 'pro';
   const isKids = userProfile.theme === 'kids';
 
