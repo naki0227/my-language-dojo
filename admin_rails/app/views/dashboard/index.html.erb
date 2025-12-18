@@ -1,0 +1,46 @@
+<div class="container mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold mb-8 text-gray-800">Vidnitive Admin Dashboard</h1>
+
+  <!-- Top Stats -->
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+      <h2 class="text-xl font-semibold text-gray-700">Total Study Guides</h2>
+      <p class="text-4xl font-bold text-blue-600 mt-2"><%= @study_guides_count %></p>
+    </div>
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+      <h2 class="text-xl font-semibold text-gray-700">Total Videos</h2>
+      <p class="text-4xl font-bold text-green-600 mt-2"><%= @videos_count %></p>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100 mb-8">
+    <h2 class="text-2xl font-bold mb-4 text-gray-800">Test Generation Activity</h2>
+    <%= column_chart @study_guides_by_day, colors: ["#3b82f6"] %>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <!-- Recent Study Guides -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+      <h3 class="text-xl font-bold mb-4 text-gray-800">Recent Study Guides</h3>
+      <% if @recent_study_guides.any? %>
+        <ul class="divide-y divide-gray-200">
+          <% @recent_study_guides.each do |guide| %>
+            <li class="py-3">
+              <div class="text-sm font-medium text-gray-900"><%= guide.try(:title).presence || guide.video_id %></div>
+              <div class="text-xs text-gray-500"><%= guide.created_at.strftime("%Y-%m-%d %H:%M") %></div>
+            </li>
+          <% end %>
+        </ul>
+      <% else %>
+        <p class="text-gray-500">No study guides found.</p>
+      <% end %>
+    </div>
+
+    <!-- Video Subjects (Popularity Proxy) -->
+    <div class="bg-white p-6 rounded-lg shadow-md border border-gray-100">
+      <h3 class="text-xl font-bold mb-4 text-gray-800">Videos by Subject</h3>
+      <%= pie_chart @videos_by_subject %>
+    </div>
+  </div>
+</div>

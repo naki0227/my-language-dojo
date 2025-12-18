@@ -1,0 +1,47 @@
+# Ignore bundler config.
+/.bundle
+
+# Ignore the default SQLite database.
+/db/*.sqlite3
+/db/*.sqlite3-journal
+/db/*.sqlite3-shm
+/db/*.sqlite3-wal
+
+# Ignore all logfiles and tempfiles.
+/log/*
+/tmp/*
+!/log/.keep
+!/tmp/.keep
+
+# Ignore pidfiles, but keep the directory.
+/tmp/pids/*
+!/tmp/pids/
+!/tmp/pids/.keep
+
+# Ignore storage (uploaded files in development and any SQLite databases).
+/storage/*
+!/storage/.keep
+/tmp/storage/*
+!/tmp/storage/.keep
+
+# Ignore public assets
+/public/assets
+
+# Ignore master key for decrypting credentials and more.
+/config/master.key
+
+# Ignore custom credentials files.
+/config/credentials/*.key
+
+# Ignore environment variables.
+.env*
+.env
+
+# Ignore node_modules
+/node_modules
+
+# Ignore vendor/bundle (local gem install)
+/vendor/bundle
+
+# Ignore Mac files
+.DS_Store

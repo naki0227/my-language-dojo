@@ -22,12 +22,14 @@ Google Gemini APIを活用し、動画の字幕データから「単語リスト
 * **AI Study Guides:** Gemini 1.5 Flash/Proを活用し、動画内容に基づいた語彙・文法解説・クイズを自動生成。
 * **Gamification:** XP（経験値）システム、レベルアップ機能による学習継続の動機付け。
 * **Voice Recorder:** ブラウザ録音機能による発音練習。
+* **Admin Dashboard:** Ruby on Railsで構築された管理者用ダッシュボード。テスト生成数や人気動画の統計を可視化。
 
 ## 技術スタック (Tech Stack)
 
 * **Frontend:** Next.js 15 (App Router), TypeScript, Tailwind CSS, Shadcn UI
 * **Backend / DB:** Supabase (PostgreSQL, Auth)
 * **AI:** Google Gemini API (Generative AI)
+* **Admin Tool:** Ruby on Rails 8, Tailwind CSS, Chartkick
 * **Deployment:** Vercel
 
 ## こだわった点・技術的選定 (Technical Highlights)
