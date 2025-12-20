@@ -1,47 +1,111 @@
-# Vidnitive (My Language Dojo)
+# Vidnitive (My Language Dojo) 🥋
 
-**「動画を見ていたら、いつの間にか学んでいた」を実現する、AI搭載の没入型語学学習プラットフォーム**
+<p align="center">
+  <img src="public/icon.png" width="120" alt="Vidnitive Logo" />
+</p>
 
-![App Screenshot](./docs/screenshot.png)
+<p align="center">
+  <b>「動画を見ていたら、いつの間にか学んでいた」</b><br>
+  AI-Powered Immersive Language Learning Platform
+</p>
 
-## 概要 (Overview)
+<p align="center">
+  <img src="./docs/screenshot.png" width="600" alt="App Screenshot" />
+</p>
 
-YouTube上のあらゆる動画を「語学教材」に変換する学習プラットフォームです。
+---
+
+## 📖 概要 (Overview)
+
+**Vidnitive** は、YouTube上のあらゆる動画を「語学教材」に変換する学習プラットフォームです。
 Google Gemini APIを活用し、動画の字幕データから「単語リスト」「文法解説」「理解度クイズ」をリアルタイムで生成。
 ユーザーは興味のある動画（エンタメ、ニュース、Vlogなど）を見るだけで、パーソナライズされた学習が可能になります。
 
-## 開発背景 (Background)
+## 💡 開発背景 (Background)
 
 私は**個別指導塾の講師**として働く中で、「既存の教材がつまらなく、生徒の学習継続率が低い」という課題に直面しました。
 また、**USJ（ユニバーサル・スタジオ・ジャパン）でのクルー経験**から、「没入感（Immersion）」こそが人の行動を変える鍵だと学びました。
 これらを掛け合わせ、「生徒が好きな動画で、遊びのように学べるツール」を作るために開発しました。
 
-## 主な機能 (Features)
+## ✨ 主な機能 (Key Features)
 
-* **Video Learning:** YouTube動画のデュアル字幕表示、インタラクティブなトランスクリプト同期。
-* **AI Study Guides:** Gemini 1.5 Flash/Proを活用し、動画内容に基づいた語彙・文法解説・クイズを自動生成。
-* **Gamification:** XP（経験値）システム、レベルアップ機能による学習継続の動機付け。
-* **Voice Recorder:** ブラウザ録音機能による発音練習。
-* **Admin Dashboard:** Ruby on Railsで構築された管理者用ダッシュボード。テスト生成数や人気動画の統計を可視化。
+### 1. 📺 Video Learning
+* **概要:** YouTube動画のデュアル字幕表示、インタラクティブなトランスクリプト同期。
+* **特徴:** クリックするだけでその時点から再生、単語の意味を即座に検索。
 
-## 技術スタック (Tech Stack)
+### 2. 🤖 AI Study Guides
+* **概要:** 動画の内容理解を深めるための学習ガイドを自動生成。
+* **技術:** `Gemini 1.5 Flash` を活用し、文脈に沿った「重要語彙」「文法ポイント」「要約クイズ」をリアルタイムに出力。System InstructionによるJSONスキーマ制御で高精度を実現。
 
-* **Frontend:** Next.js 15 (App Router), TypeScript, Tailwind CSS, Shadcn UI
-* **Backend / DB:** Supabase (PostgreSQL, Auth)
-* **AI:** Google Gemini API (Generative AI)
-* **Admin Tool:** Ruby on Rails 8, Tailwind CSS, Chartkick
-* **Deployment:** Vercel
+### 3. 🎮 Gamification
+* **概要:** XP（経験値）システム、レベルアップ機能による学習継続の動機付け。
+* **記録:** 学習履歴をヒートマップで可視化し、日々の積み重ねを実感。
+
+### 4. 🎙️ Voice Recorder
+* **概要:** シャドーイング練習のためのブラウザ録音機能。
+* **技術:** Web Audio APIを活用し、自分の発音を録音・再生して比較可能。
+
+---
+
+## 🛠 技術スタック (Tech Stack)
+
+| Category | Technology | Usage |
+| :--- | :--- | :--- |
+| **Frontend** | **Next.js 15** (App Router) | SSR/RSC, Static Export for Mobile |
+| **Language** | **TypeScript** | Strict Type Safety |
+| **Styling** | **Tailwind CSS** | Shadcn UI, Responsive Design |
+| **Backend** | **Supabase** | Auth, Database (PostgreSQL), Edge Functions |
+| **AI Model** | **Google Gemini 1.5** | Flash (Real-time), Pro (High Reasoning) |
+| **Mobile** | **Capacitor** | iOS/Android Native Wrappers |
+| **Admin Tool** | **Ruby on Rails 8** | 管理者用ダッシュボード (KPI分析) |
+| **Deployment** | **Vercel** | Web Hosting & Edge Network |
+
+---
+
+## 🏗️ アーキテクチャ (Architecture)
+
+```mermaid
+graph TD
+    User["📱 User (Web/Mobile)"]
+    
+    subgraph "Frontend (Next.js / Capacitor)"
+        App["Vidnitive Client"]
+        Player["YouTube Player"]
+    end
+    
+    subgraph "Backend (Supabase)"
+        Auth["Authentication"]
+        DB[("PostgreSQL\n(User Data, Progress)")]
+    end
+    
+    subgraph "AI Core (Google)"
+        Gemini["✨ Gemini 1.5 API"]
+    end
+    
+    subgraph "External"
+        YT["YouTube Data API"]
+    end
+
+    %% Flows
+    User -->|Watch| App
+    App -->|Embed| Player
+    App -->|Fetch Captions| YT
+    
+    App -->|Generate Guide| Gemini
+    Gemini -->|JSON Response| App
+    
+    App -->|Save Progress| DB
+    App -->|Auth| Auth
+```
 
 ## こだわった点・技術的選定 (Technical Highlights)
 
 ### 1. 開発スピードと品質の両立 (Development Strategy)
-
 本プロジェクトは個人開発でありながら、商用レベルのUI/UXを目指しました。
 そのため、認証(Auth)や決済基盤の構築にはSaaSボイラープレート（**Antigravity**）を採用し、**「車輪の再発明」を徹底的に排除しました。**
 浮いた時間の9割を、コア機能である「AIによる学習体験の向上（プロンプトエンジニアリング、UIのレスポンス）」に投資しています。
 
 ### 2. AIレスポンスの最適化 (AI Engineering)
-
 Gemini APIからの出力を安定させるため、System Instructionで厳格なJSONスキーマを定義。
 ハルシネーション（嘘の出力）を抑制し、学習教材としての精度を担保するプロンプト設計に注力しました。
 
