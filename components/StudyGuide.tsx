@@ -50,13 +50,13 @@ export const StudyGuide = ({
     return (
         <div className={`${isMobile ? 'w-full h-auto mt-8' : 'w-[450px] h-full shrink-0'} flex flex-col bg-gray-50/50`}>
             {/* Header */}
-            <div className="bg-white px-6 py-5 border-b border-gray-100 flex justify-between items-center sticky top-0 z-10 shadow-sm">
-                <div className="flex items-center gap-2">
+            <div className="bg-white px-6 py-5 border-b border-gray-100 flex items-center justify-between sticky top-0 z-10 shadow-sm gap-4">
+                <div className="flex items-center gap-2 shrink-0">
                     <BookOpen className="w-5 h-5 text-indigo-600" />
                     <h2 className="text-base font-bold text-gray-800">Study Guide</h2>
                 </div>
 
-                <div className="flex gap-1.5">
+                <div className="flex gap-1.5 overflow-x-auto no-scrollbar mask-linear-fade pb-1 -mb-1 max-w-full">
                     {SUPPORTED_LANGUAGES.map(lang => {
                         const isSelected = explanationLangs.includes(lang.dbName);
                         return (
@@ -72,7 +72,7 @@ export const StudyGuide = ({
                                     loadVideo(videoId, newLangs);
                                 }}
                                 className={`
-                                    w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all duration-200
+                                    w-8 h-8 flex items-center justify-center rounded-lg text-xs font-bold transition-all duration-200 shrink-0
                                     ${isSelected
                                         ? 'bg-indigo-600 text-white shadow-indigo-200 shadow-md transform scale-105'
                                         : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
