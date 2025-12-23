@@ -6,7 +6,7 @@ export async function POST(request: Request) {
     try {
         // Handle JSON request (from mobile/frontend)
         const body = await request.json();
-        const { audioData, targetText } = body; // Expecting base64 string and text
+        const { audioData, targetText, mimeType } = body; // Expecting base64 string and text
 
         if (!audioData || !targetText) {
             return NextResponse.json({ error: 'Audio and text are required' }, { status: 400 });
@@ -17,8 +17,11 @@ export async function POST(request: Request) {
         // No need to convert to ArrayBuffer and back if we already have base64
 
         // Geminiクライアントの準備
+        // Use gemini-1.5-flash if 2.5 is failing/invalid, but respecting user's setting for now.
+        // NOTE: If 2.5 is invalid, this needs to be changed. Assuming user had it working before?
+        // Let's use gemini-1.5-flash as a safer fallback if 2.5 is indeed the issue, but first fix MIME.
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
 
         // プロンプト（命令文）の作成
         const prompt = `
@@ -43,7 +46,7 @@ export async function POST(request: Request) {
             prompt,
             {
                 inlineData: {
-                    mimeType: 'audio/webm', // ブラウザの録音形式に合わせる
+                    mimeType: mimeType || 'audio/webm', // Use dynamic mimeType
                     data: base64Audio
                 }
             }

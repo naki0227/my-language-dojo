@@ -110,7 +110,8 @@ export default function VoiceRecorder({ targetText }: { targetText: string }) {
                     },
                     body: JSON.stringify({
                         targetText,
-                        audioData: base64Audio
+                        audioData: base64Audio,
+                        mimeType: audioBlob.type // Send actual MIME type
                     })
                 });
 
