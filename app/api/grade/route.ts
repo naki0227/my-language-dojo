@@ -17,11 +17,8 @@ export async function POST(request: Request) {
         // No need to convert to ArrayBuffer and back if we already have base64
 
         // Geminiクライアントの準備
-        // Use gemini-1.5-flash if 2.5 is failing/invalid, but respecting user's setting for now.
-        // NOTE: If 2.5 is invalid, this needs to be changed. Assuming user had it working before?
-        // Let's use gemini-1.5-flash as a safer fallback if 2.5 is indeed the issue, but first fix MIME.
         const genAI = new GoogleGenerativeAI(process.env.GOOGLE_GEMINI_KEY!);
-        const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+        const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
         // プロンプト（命令文）の作成
         const prompt = `
