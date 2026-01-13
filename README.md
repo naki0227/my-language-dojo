@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>「動画を見ていたら、いつの間にか学んでいた」</b><br>
+  <b>"Learn before you know it, just by watching."</b><br>
   AI-Powered Immersive Language Learning Platform
 </p>
 
@@ -15,39 +15,41 @@
 
 ---
 
-## 📖 概要 (Overview)
+[🇯🇵 Japanese (日本語)](README.ja.md)
 
-**Vidnitive** は、YouTube上のあらゆる動画を「語学教材」に変換する学習プラットフォームです。
-Google Gemini APIを活用し、動画の字幕データから「単語リスト」「文法解説」「理解度クイズ」をリアルタイムで生成。
-ユーザーは興味のある動画（エンタメ、ニュース、Vlogなど）を見るだけで、パーソナライズされた学習が可能になります。
+## 📖 Overview
 
-## 💡 開発背景 (Background)
+**Vidnitive** is a learning platform that transforms any YouTube video into "Language Learning Material".
+Leveraging the Google Gemini API, it generates "Vocabulary Lists", "Grammar Explanations", and "Comprehension Quizzes" in real-time from the video's subtitle data.
+Users can enjoy personalized learning simply by watching videos they are interested in (Entertainment, News, Vlogs, etc.).
 
-私は**個別指導塾の講師**として働く中で、「既存の教材がつまらなく、生徒の学習継続率が低い」という課題に直面しました。
-また、**USJ（ユニバーサル・スタジオ・ジャパン）でのクルー経験**から、「没入感（Immersion）」こそが人の行動を変える鍵だと学びました。
-これらを掛け合わせ、「生徒が好きな動画で、遊びのように学べるツール」を作るために開発しました。
+## 💡 Background
 
-## ✨ 主な機能 (Key Features)
+While working as a **tutor in a private cram school**, I faced the issue that "existing materials were boring and student retention rates were low."
+Also, from my **crew experience at USJ (Universal Studios Japan)**, I learned that "Immersion" is the key to changing human behavior.
+Combining these, I developed this tool to create an environment where "students can learn like playing with their favorite videos".
+
+## ✨ Key Features
 
 ### 1. 📺 Video Learning
-* **概要:** YouTube動画のデュアル字幕表示、インタラクティブなトランスクリプト同期。
-* **特徴:** クリックするだけでその時点から再生、単語の意味を即座に検索。
+*   **Overview:** Dual subtitle display for YouTube videos, interactive transcript synchronization.
+*   **Feature:** Click to play from that point, instantly look up word meanings.
 
 ### 2. 🤖 AI Study Guides
-* **概要:** 動画の内容理解を深めるための学習ガイドを自動生成。
-* **技術:** `Gemini 1.5 Flash` を活用し、文脈に沿った「重要語彙」「文法ポイント」「要約クイズ」をリアルタイムに出力。System InstructionによるJSONスキーマ制御で高精度を実現。
+*   **Overview:** Automatically generates study guides to deepen understanding of video content.
+*   **Technology:** Uses `Gemini 1.5 Flash` to output context-aware "Key Vocabulary", "Grammar Points", and "Summary Quizzes" in real-time. High precision achieved via JSON schema control in System Instructions.
 
 ### 3. 🎮 Gamification
-* **概要:** XP（経験値）システム、レベルアップ機能による学習継続の動機付け。
-* **記録:** 学習履歴をヒートマップで可視化し、日々の積み重ねを実感。
+*   **Overview:** XP (Experience Points) system and leveling up to motivate continuous learning.
+*   **Record:** Visualize learning history with heatmaps to feel daily progress.
 
 ### 4. 🎙️ Voice Recorder
-* **概要:** シャドーイング練習のためのブラウザ録音機能。
-* **技術:** Web Audio APIを活用し、自分の発音を録音・再生して比較可能。
+*   **Overview:** Browser recording function for shadowing practice.
+*   **Technology:** Uses Web Audio API to record and playback your pronunciation for comparison.
 
 ---
 
-## 🛠 技術スタック (Tech Stack)
+## 🛠 Tech Stack
 
 | Category | Technology | Usage |
 | :--- | :--- | :--- |
@@ -57,12 +59,12 @@ Google Gemini APIを活用し、動画の字幕データから「単語リスト
 | **Backend** | **Supabase** | Auth, Database (PostgreSQL), Edge Functions |
 | **AI Model** | **Google Gemini 1.5** | Flash (Real-time), Pro (High Reasoning) |
 | **Mobile** | **Capacitor** | iOS/Android Native Wrappers |
-| **Admin Tool** | **Ruby on Rails 8** | 管理者用ダッシュボード (KPI分析) |
+| **Admin Tool** | **Ruby on Rails 8** | Admin Dashboard (KPI Analysis) |
 | **Deployment** | **Vercel** | Web Hosting & Edge Network |
 
 ---
 
-## 🏗️ アーキテクチャ (Architecture)
+## 🏗️ Architecture
 
 ```mermaid
 graph TD
@@ -98,16 +100,16 @@ graph TD
     App -->|Auth| Auth
 ```
 
-## こだわった点・技術的選定 (Technical Highlights)
+## Technical Highlights
 
-### 1. 開発スピードと品質の両立 (Development Strategy)
-本プロジェクトは個人開発でありながら、商用レベルのUI/UXを目指しました。
-そのため、認証(Auth)や決済基盤の構築にはSaaSボイラープレート（**Antigravity**）を採用し、**「車輪の再発明」を徹底的に排除しました。**
-浮いた時間の9割を、コア機能である「AIによる学習体験の向上（プロンプトエンジニアリング、UIのレスポンス）」に投資しています。
+### 1. Development Strategy
+Although this is a personal project, I aimed for a commercial-level UI/UX.
+Therefore, I adopted a SaaS boilerplate (**Antigravity**) for building authentication and payment infrastructure, thoroughly eliminating **"reinventing the wheel"**.
+90% of the saved time was invested in core functions, "improving the learning experience with AI (Prompt Engineering, UI Response)".
 
-### 2. AIレスポンスの最適化 (AI Engineering)
-Gemini APIからの出力を安定させるため、System Instructionで厳格なJSONスキーマを定義。
-ハルシネーション（嘘の出力）を抑制し、学習教材としての精度を担保するプロンプト設計に注力しました。
+### 2. AI Engineering
+To stabilize the output from the Gemini API, I defined a strict JSON schema in the System Instruction.
+I focused on prompt design to suppress hallucinations and ensure accuracy as learning material.
 
 ---
 
@@ -133,7 +135,7 @@ Gemini APIからの出力を安定させるため、System Instructionで厳格�
 
 3. Set up environment variables:
    Create a `.env.local` file in the root directory.
-   ```env
+   ```bash
    NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
    NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
    SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
